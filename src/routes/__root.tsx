@@ -80,10 +80,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "HighTicket Closer — Painel comercial" },
       { name: "description", content: "Mini-CRM para controle de leads high ticket: Kanban, prioridades, SLA, tags e feedbacks de reunião." },
-      { property: "og:title", content: "HighTicket Closer" },
-      { property: "og:description", content: "Painel comercial simples e visual para closers." },
+      { property: "og:title", content: "HighTicket Closer — Painel comercial" },
+      { property: "og:description", content: "Mini-CRM para controle de leads high ticket: Kanban, prioridades, SLA, tags e feedbacks de reunião." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "HighTicket Closer — Painel comercial" },
+      { name: "twitter:description", content: "Mini-CRM para controle de leads high ticket: Kanban, prioridades, SLA, tags e feedbacks de reunião." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fead0b95-a480-4be4-81b0-2b20b99e80a8/id-preview-3e18581a--7e5c263a-2ffe-4220-81d2-5b4fcafe26fd.lovable.app-1783705935980.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fead0b95-a480-4be4-81b0-2b20b99e80a8/id-preview-3e18581a--7e5c263a-2ffe-4220-81d2-5b4fcafe26fd.lovable.app-1783705935980.png" },
     ],
     links: [
       {
