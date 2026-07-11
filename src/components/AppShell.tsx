@@ -1,16 +1,19 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Kanban, LayoutDashboard, Plus, Upload } from "lucide-react";
+import { Kanban, LayoutDashboard, Plus, Upload, Link2, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
-  onNewLead: () => void;
+  onNewLead?: () => void;
+  primaryAction?: { label: string; onClick: () => void };
 }
 
-export function AppShell({ children, onNewLead }: Props) {
+export function AppShell({ children, onNewLead, primaryAction }: Props) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const action = primaryAction ?? (onNewLead ? { label: "Novo Lead", onClick: onNewLead } : null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,19 +34,33 @@ export function AppShell({ children, onNewLead }: Props) {
                 <LayoutDashboard className="size-4" /> Dashboard
               </Button>
             </Link>
+            <Link to="/links">
+              <Button variant={pathname === "/links" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                <Link2 className="size-4" /> Links
+              </Button>
+            </Link>
+            <Link to="/vendas">
+              <Button variant={pathname === "/vendas" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                <DollarSign className="size-4" /> Vendas
+              </Button>
+            </Link>
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2"
-              onClick={() => toast.info("Importação CSV em breve")}
-            >
-              <Upload className="size-4" /> Importar CSV
-            </Button>
-            <Button size="sm" className="gap-2" onClick={onNewLead}>
-              <Plus className="size-4" /> Novo Lead
-            </Button>
+            {pathname === "/" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2"
+                onClick={() => toast.info("Importação CSV em breve")}
+              >
+                <Upload className="size-4" /> Importar CSV
+              </Button>
+            )}
+            {action && (
+              <Button size="sm" className="gap-2" onClick={action.onClick}>
+                <Plus className="size-4" /> {action.label}
+              </Button>
+            )}
           </div>
         </div>
       </header>
