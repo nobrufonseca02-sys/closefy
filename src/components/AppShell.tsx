@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Kanban, LayoutDashboard, Plus, Upload } from "lucide-react";
+import { Kanban, LayoutDashboard, Link as LinkIcon, Plus, ShoppingCart, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
@@ -21,14 +21,24 @@ export function AppShell({ children, onNewLead }: Props) {
             <span className="font-semibold tracking-tight">HighTicket Closer</span>
           </div>
           <nav className="ml-4 flex items-center gap-1">
+            <Link to="/dashboard">
+              <Button variant={pathname === "/dashboard" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                <LayoutDashboard className="size-4" /> Dashboard
+              </Button>
+            </Link>
             <Link to="/">
               <Button variant={pathname === "/" ? "secondary" : "ghost"} size="sm" className="gap-2">
                 <Kanban className="size-4" /> Kanban
               </Button>
             </Link>
-            <Link to="/dashboard">
-              <Button variant={pathname === "/dashboard" ? "secondary" : "ghost"} size="sm" className="gap-2">
-                <LayoutDashboard className="size-4" /> Dashboard
+            <Link to="/links">
+              <Button variant={pathname === "/links" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                <LinkIcon className="size-4" /> Links
+              </Button>
+            </Link>
+            <Link to="/vendas">
+              <Button variant={pathname === "/vendas" ? "secondary" : "ghost"} size="sm" className="gap-2">
+                <ShoppingCart className="size-4" /> Vendas
               </Button>
             </Link>
           </nav>
