@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      important_links: {
+        Row: {
+          category: string
+          client_name: string | null
+          company_name: string | null
+          created_at: string
+          description: string | null
+          id: string
+          lead_id: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          category?: string
+          client_name?: string | null
+          company_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          lead_id?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          category?: string
+          client_name?: string | null
+          company_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          lead_id?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "important_links_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_feedbacks: {
         Row: {
           created_at: string
@@ -138,6 +188,80 @@ export type Database = {
           whatsapp?: string
         }
         Relationships: []
+      }
+      sales: {
+        Row: {
+          amount_paid: number
+          client_name: string
+          commission_rate: number
+          commission_value: number
+          company_name: string
+          confirmed_payment_date: string | null
+          created_at: string
+          expected_payment_date: string | null
+          id: string
+          lead_id: string | null
+          notes: string | null
+          owner: string | null
+          payment_link: string | null
+          payment_method: string | null
+          payment_status: string
+          product_name: string
+          sale_date: string
+          sale_value: number
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          client_name: string
+          commission_rate?: number
+          commission_value?: number
+          company_name: string
+          confirmed_payment_date?: string | null
+          created_at?: string
+          expected_payment_date?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          owner?: string | null
+          payment_link?: string | null
+          payment_method?: string | null
+          payment_status?: string
+          product_name: string
+          sale_date?: string
+          sale_value?: number
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          client_name?: string
+          commission_rate?: number
+          commission_value?: number
+          company_name?: string
+          confirmed_payment_date?: string | null
+          created_at?: string
+          expected_payment_date?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          owner?: string | null
+          payment_link?: string | null
+          payment_method?: string | null
+          payment_status?: string
+          product_name?: string
+          sale_date?: string
+          sale_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
