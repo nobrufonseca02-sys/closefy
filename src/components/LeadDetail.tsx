@@ -62,6 +62,9 @@ export function LeadDetail({ lead, onOpenChange, onEdit }: Props) {
               <div className="mt-0.5 text-sm text-muted-foreground">{lead.nome_empresa}</div>
             </div>
             <div className="flex gap-1">
+              <Button size="sm" className="gap-1" onClick={() => setSaleOpen(true)}>
+                <DollarSign className="size-3.5" /> Registrar compra
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => onEdit(lead)}>
                 <Pencil className="size-4" />
               </Button>
