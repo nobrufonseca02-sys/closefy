@@ -44,6 +44,7 @@ function KanbanPage() {
   const [saleForLead, setSaleForLead] = useState<Lead | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const pendingSaleSaved = useRef(false);
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
