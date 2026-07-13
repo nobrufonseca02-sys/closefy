@@ -5,9 +5,12 @@ import { LeadForm } from "@/components/LeadForm";
 import { LeadDetail } from "@/components/LeadDetail";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TagBadge } from "@/components/TagBadge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight, Clock, DollarSign, Flame, Handshake, Snowflake, Target, Trophy, Wallet } from "lucide-react";
 import { useLeads } from "@/lib/leads-api";
+import { useSales } from "@/lib/commerce-api";
+import { formatBRL } from "@/lib/commerce-domain";
 import {
   SLA_STYLES, calcPriority, calcSLA, etapaLabel, formatCurrency,
   formatDate, hoursSince, relativeTime, tempStyle, type Lead,
@@ -22,6 +25,7 @@ export const Route = createFileRoute("/dashboard")({
 
 function DashboardPage() {
   const { data: leads = [] } = useLeads();
+  const { data: sales = [] } = useSales();
   const [formOpen, setFormOpen] = useState(false);
   const [detail, setDetail] = useState<Lead | null>(null);
 
@@ -41,6 +45,22 @@ function DashboardPage() {
     return { active, quentes, fechamento, pagamento, ganhas, fuVencidos, semAtendimento, pipeline, proximasCalls };
   }, [leads]);
 
+  const salesStats = useMemo(() => {
+    const valid = sales.filter((s) => s.payment_status !== "cancelado" && s.payment_status !== "reembolsado");
+    const totalSold = valid.reduce((a, s) => a + Number(s.sale_value), 0);
+    const totalReceived = sales.reduce((a, s) => a + Number(s.amount_paid || (s.payment_status === "pago" ? s.sale_value : 0)), 0);
+    const totalPending = valid
+      .filter((s) => s.payment_status === "aguardando" || s.payment_status === "parcial" || s.payment_status === "inadimplente")
+      .reduce((a, s) => a + Number(s.sale_value) - Number(s.amount_paid || 0), 0);
+    const commissionPredicted = valid.reduce((a, s) => a + Number(s.commission_value), 0);
+    const commissionConfirmed = valid
+      .filter((s) => s.payment_status === "pago")
+      .reduce((a, s) => a + Number(s.commission_value), 0);
+    const paidCount = valid.filter((s) => s.payment_status === "pago").length;
+    const avgTicket = paidCount > 0 ? totalReceived / paidCount : 0;
+    return { totalSold, totalReceived, totalPending, commissionPredicted, commissionConfirmed, paidCount, avgTicket, count: valid.length };
+  }, [sales]);
+
   const detailLive = detail ? leads.find((l) => l.id === detail.id) ?? null : null;
 
   return (
@@ -56,6 +76,18 @@ function DashboardPage() {
         <Stat icon={<Snowflake className="size-4" />} label="Sem atendimento >48h" value={stats.semAtendimento.length} tone="warning" />
         <Stat icon={<DollarSign className="size-4" />} label="Pipeline potencial" value={formatCurrency(stats.pipeline)} />
         <Stat icon={<Trophy className="size-4 text-success" />} label="Vendas ganhas" value={stats.ganhas.length} tone="success" />
+      </div>
+
+      <h2 className="mt-6 mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Financeiro</h2>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat icon={<DollarSign className="size-4" />} label="Total vendido" value={formatBRL(salesStats.totalSold)} />
+        <Stat icon={<Wallet className="size-4 text-success" />} label="Total recebido" value={formatBRL(salesStats.totalReceived)} tone="success" />
+        <Stat icon={<Clock className="size-4 text-warning-foreground" />} label="Aguardando pagamento" value={formatBRL(salesStats.totalPending)} tone="warning" />
+        <Stat icon={<Trophy className="size-4" />} label="Ticket médio" value={formatBRL(salesStats.avgTicket)} />
+        <Stat icon={<DollarSign className="size-4" />} label="Comissão prevista" value={formatBRL(salesStats.commissionPredicted)} />
+        <Stat icon={<DollarSign className="size-4 text-success" />} label="Comissão confirmada" value={formatBRL(salesStats.commissionConfirmed)} tone="success" />
+        <Stat icon={<Trophy className="size-4" />} label="Vendas do período" value={salesStats.count} />
+        <Stat icon={<Wallet className="size-4" />} label="Leads aguardando pgto" value={stats.pagamento.length} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -186,7 +218,7 @@ function PriorityList({
                     {l.tags.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {l.tags.slice(0, 4).map((t) => (
-                          <Badge key={t} variant="outline" className="h-4 px-1 text-[10px] font-normal">{t}</Badge>
+                          <TagBadge key={t} name={t} />
                         ))}
                       </div>
                     )}

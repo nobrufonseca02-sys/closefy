@@ -1,14 +1,15 @@
 import { useDraggable } from "@dnd-kit/core";
-import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Calendar, Clock } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, DollarSign } from "lucide-react";
 import { SLA_STYLES, calcSLA, formatCurrency, formatDate, relativeTime, tempStyle, type Lead } from "@/lib/domain";
+import { TagBadge } from "./TagBadge";
 
 interface Props {
   lead: Lead;
   onOpen: (l: Lead) => void;
+  onRegisterSale?: (l: Lead) => void;
 }
 
-export function LeadCard({ lead, onOpen }: Props) {
+export function LeadCard({ lead, onOpen, onRegisterSale }: Props) {
   const sla = calcSLA(lead);
   const slaStyle = SLA_STYLES[sla];
   const temp = tempStyle(lead.temperatura);
@@ -50,7 +51,7 @@ export function LeadCard({ lead, onOpen }: Props) {
       {lead.tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {lead.tags.slice(0, 3).map((t) => (
-            <Badge key={t} variant="outline" className="h-5 px-1.5 text-[10px] font-normal">{t}</Badge>
+            <TagBadge key={t} name={t} />
           ))}
           {lead.tags.length > 3 && (
             <span className="text-[10px] text-muted-foreground">+{lead.tags.length - 3}</span>
@@ -69,13 +70,28 @@ export function LeadCard({ lead, onOpen }: Props) {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => onOpen(lead)}
-        className="mt-2 w-full rounded-md border border-dashed py-1 text-[11px] text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-accent"
-      >
-        Ver detalhes
-      </button>
+      <div className="mt-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={() => onOpen(lead)}
+          className="flex-1 rounded-md border border-dashed py-1 text-[11px] text-muted-foreground hover:bg-accent"
+        >
+          Ver detalhes
+        </button>
+        {onRegisterSale && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRegisterSale(lead);
+            }}
+            className="inline-flex items-center gap-1 rounded-md border border-success/40 bg-success/10 px-2 py-1 text-[11px] font-medium text-success hover:bg-success/20"
+            title="Registrar compra"
+          >
+            <DollarSign className="size-3" /> Compra
+          </button>
+        )}
+      </div>
     </div>
   );
 }

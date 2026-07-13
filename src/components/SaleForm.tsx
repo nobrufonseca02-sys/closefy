@@ -18,6 +18,7 @@ interface Props {
   onOpenChange: (o: boolean) => void;
   sale?: Sale | null;
   defaultLeadId?: string | null;
+  onSaved?: (sale: Sale) => void | Promise<void>;
 }
 
 type F = {
@@ -63,7 +64,7 @@ const empty = (): F => ({
   amount_paid: "",
 });
 
-export function SaleForm({ open, onOpenChange, sale, defaultLeadId }: Props) {
+export function SaleForm({ open, onOpenChange, sale, defaultLeadId, onSaved }: Props) {
   const [f, setF] = useState<F>(empty());
   const { data: leads = [] } = useLeads();
   const { data: links = [] } = useLinks();
@@ -151,18 +152,18 @@ export function SaleForm({ open, onOpenChange, sale, defaultLeadId }: Props) {
       amount_paid: f.amount_paid ? Number(f.amount_paid) : (f.payment_status === "pago" ? saleValueNum : 0),
     };
     try {
-      let savedId: string;
+      let saved: Sale;
       if (sale) {
-        const r = await update.mutateAsync({ id: sale.id, patch: payload });
-        savedId = r.id;
+        saved = await update.mutateAsync({ id: sale.id, patch: payload });
         toast.success("Venda atualizada");
       } else {
-        const r = await create.mutateAsync(payload);
-        savedId = r.id;
-        toast.success("Venda criada");
+        saved = await create.mutateAsync(payload);
+        toast.success("Compra registrada com sucesso.");
       }
-      // sugerir mover lead para "venda_ganha" se pago
-      if (payload.lead_id && payload.payment_status === "pago") {
+      if (onSaved) {
+        await onSaved(saved);
+      } else if (payload.lead_id && payload.payment_status === "pago") {
+        // fallback: sugerir mover lead para "venda_ganha" se pago
         const lead = leads.find((l) => l.id === payload.lead_id);
         if (lead && lead.etapa_funil !== "venda_ganha") {
           if (confirm(`Mover lead "${lead.nome_cliente}" para "Venda ganha"?`)) {
@@ -171,7 +172,6 @@ export function SaleForm({ open, onOpenChange, sale, defaultLeadId }: Props) {
         }
       }
       onOpenChange(false);
-      void savedId;
     } catch (e) {
       toast.error("Erro ao salvar", { description: (e as Error).message });
     }

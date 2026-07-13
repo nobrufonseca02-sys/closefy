@@ -120,6 +120,41 @@ export type Database = {
           },
         ]
       }
+      lead_history: {
+        Row: {
+          created_at: string
+          from_stage: string | null
+          id: string
+          lead_id: string
+          note: string | null
+          to_stage: string
+        }
+        Insert: {
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          lead_id: string
+          note?: string | null
+          to_stage: string
+        }
+        Update: {
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          lead_id?: string
+          note?: string | null
+          to_stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           cargo: string | null
@@ -262,6 +297,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tag_catalog: {
+        Row: {
+          bg_color: string
+          created_at: string
+          id: string
+          name: string
+          text_color: string
+          updated_at: string
+        }
+        Insert: {
+          bg_color?: string
+          created_at?: string
+          id?: string
+          name: string
+          text_color?: string
+          updated_at?: string
+        }
+        Update: {
+          bg_color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          text_color?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

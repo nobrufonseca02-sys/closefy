@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, DollarSign, ExternalLink, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -15,6 +15,11 @@ import {
   type EtapaFunil, type Lead, type Temperatura,
 } from "@/lib/domain";
 import { useCreateFeedback, useDeleteFeedback, useDeleteLead, useFeedbacks, useUpdateLead } from "@/lib/leads-api";
+import { useSales } from "@/lib/commerce-api";
+import { useLeadHistory } from "@/lib/tag-catalog-api";
+import { formatBRL, statusStyle } from "@/lib/commerce-domain";
+import { SaleForm } from "./SaleForm";
+
 import { TagsInput } from "./TagsInput";
 
 interface Props {
@@ -25,12 +30,15 @@ interface Props {
 
 export function LeadDetail({ lead, onOpenChange, onEdit }: Props) {
   const { data: feedbacks = [] } = useFeedbacks(lead?.id ?? null);
+  const { data: allSales = [] } = useSales();
+  const { data: history = [] } = useLeadHistory(lead?.id ?? null);
   const update = useUpdateLead();
   const del = useDeleteLead();
   const createFb = useCreateFeedback();
   const delFb = useDeleteFeedback();
 
   const [showFbForm, setShowFbForm] = useState(false);
+  const [saleOpen, setSaleOpen] = useState(false);
 
   if (!lead) return null;
   const sla = calcSLA(lead);
@@ -54,6 +62,9 @@ export function LeadDetail({ lead, onOpenChange, onEdit }: Props) {
               <div className="mt-0.5 text-sm text-muted-foreground">{lead.nome_empresa}</div>
             </div>
             <div className="flex gap-1">
+              <Button size="sm" className="gap-1" onClick={() => setSaleOpen(true)}>
+                <DollarSign className="size-3.5" /> Registrar compra
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => onEdit(lead)}>
                 <Pencil className="size-4" />
               </Button>
@@ -240,9 +251,96 @@ export function LeadDetail({ lead, onOpenChange, onEdit }: Props) {
               )}
             </ul>
           </div>
+
+          <Separator />
+
+          <LeadSalesSection sales={allSales.filter((s) => s.lead_id === lead.id)} />
+
+          <Separator />
+
+          <LeadHistorySection history={history} />
         </div>
       </SheetContent>
+      <SaleForm open={saleOpen} onOpenChange={setSaleOpen} defaultLeadId={lead.id} />
     </Sheet>
+  );
+}
+
+function LeadSalesSection({ sales }: { sales: import("@/lib/commerce-domain").Sale[] }) {
+  const totalBought = sales
+    .filter((s) => s.payment_status !== "cancelado" && s.payment_status !== "reembolsado")
+    .reduce((a, s) => a + Number(s.sale_value), 0);
+  const totalCommission = sales.reduce((a, s) => a + Number(s.commission_value), 0);
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Compras ({sales.length})
+        </h3>
+        {sales.length > 0 && (
+          <span className="text-xs text-muted-foreground">
+            Total: <strong className="text-foreground">{formatBRL(totalBought)}</strong>
+            {" · "}Comissão: <strong className="text-foreground">{formatBRL(totalCommission)}</strong>
+          </span>
+        )}
+      </div>
+      {sales.length === 0 ? (
+        <div className="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
+          Nenhuma compra registrada
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {sales.map((s) => {
+            const st = statusStyle(s.payment_status);
+            return (
+              <li key={s.id} className="rounded-lg border bg-card p-3 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-medium">{s.product_name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(s.sale_date).toLocaleDateString("pt-BR")}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className={st.className}>{st.label}</Badge>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span>Valor: <strong className="text-foreground">{formatBRL(Number(s.sale_value))}</strong></span>
+                  <span>Comissão: <strong className="text-foreground">{formatBRL(Number(s.commission_value))}</strong></span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function LeadHistorySection({ history }: { history: import("@/lib/tag-catalog-api").LeadHistoryEntry[] }) {
+  return (
+    <div>
+      <h3 className="mb-2 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <History className="size-3" /> Histórico de movimentações
+      </h3>
+      {history.length === 0 ? (
+        <div className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground">
+          Nenhuma movimentação registrada
+        </div>
+      ) : (
+        <ul className="space-y-1.5 text-xs">
+          {history.slice(0, 20).map((h) => (
+            <li key={h.id} className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5">
+              <span>
+                {h.from_stage ? etapaLabel(h.from_stage as EtapaFunil) : "—"}
+                {" → "}
+                <strong className="text-foreground">{etapaLabel(h.to_stage as EtapaFunil)}</strong>
+              </span>
+              <span className="text-muted-foreground">{formatDate(h.created_at)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
