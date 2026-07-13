@@ -64,7 +64,7 @@ const empty = (): F => ({
   amount_paid: "",
 });
 
-export function SaleForm({ open, onOpenChange, sale, defaultLeadId }: Props) {
+export function SaleForm({ open, onOpenChange, sale, defaultLeadId, onSaved }: Props) {
   const [f, setF] = useState<F>(empty());
   const { data: leads = [] } = useLeads();
   const { data: links = [] } = useLinks();
