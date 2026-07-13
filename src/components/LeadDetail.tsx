@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, DollarSign, ExternalLink, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -15,6 +15,11 @@ import {
   type EtapaFunil, type Lead, type Temperatura,
 } from "@/lib/domain";
 import { useCreateFeedback, useDeleteFeedback, useDeleteLead, useFeedbacks, useUpdateLead } from "@/lib/leads-api";
+import { useSales } from "@/lib/commerce-api";
+import { useLeadHistory } from "@/lib/tag-catalog-api";
+import { formatBRL, statusStyle } from "@/lib/commerce-domain";
+import { SaleForm } from "./SaleForm";
+import { TagBadge } from "./TagBadge";
 import { TagsInput } from "./TagsInput";
 
 interface Props {
