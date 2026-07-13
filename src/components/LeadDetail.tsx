@@ -30,12 +30,15 @@ interface Props {
 
 export function LeadDetail({ lead, onOpenChange, onEdit }: Props) {
   const { data: feedbacks = [] } = useFeedbacks(lead?.id ?? null);
+  const { data: allSales = [] } = useSales();
+  const { data: history = [] } = useLeadHistory(lead?.id ?? null);
   const update = useUpdateLead();
   const del = useDeleteLead();
   const createFb = useCreateFeedback();
   const delFb = useDeleteFeedback();
 
   const [showFbForm, setShowFbForm] = useState(false);
+  const [saleOpen, setSaleOpen] = useState(false);
 
   if (!lead) return null;
   const sla = calcSLA(lead);
