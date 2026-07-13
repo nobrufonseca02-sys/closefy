@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight, Clock, DollarSign, Flame, Handshake, Snowflake, Target, Trophy, Wallet } from "lucide-react";
 import { useLeads } from "@/lib/leads-api";
+import { useSales } from "@/lib/commerce-api";
+import { formatBRL } from "@/lib/commerce-domain";
 import {
   SLA_STYLES, calcPriority, calcSLA, etapaLabel, formatCurrency,
   formatDate, hoursSince, relativeTime, tempStyle, type Lead,
