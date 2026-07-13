@@ -217,7 +217,7 @@ function PriorityList({
                     {l.tags.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {l.tags.slice(0, 4).map((t) => (
-                          <Badge key={t} variant="outline" className="h-4 px-1 text-[10px] font-normal">{t}</Badge>
+                          <TagBadge key={t} name={t} />
                         ))}
                       </div>
                     )}
