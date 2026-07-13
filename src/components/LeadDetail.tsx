@@ -19,7 +19,7 @@ import { useSales } from "@/lib/commerce-api";
 import { useLeadHistory } from "@/lib/tag-catalog-api";
 import { formatBRL, statusStyle } from "@/lib/commerce-domain";
 import { SaleForm } from "./SaleForm";
-import { TagBadge } from "./TagBadge";
+
 import { TagsInput } from "./TagsInput";
 
 interface Props {
