@@ -18,6 +18,7 @@ interface Props {
   onOpenChange: (o: boolean) => void;
   sale?: Sale | null;
   defaultLeadId?: string | null;
+  onSaved?: (sale: Sale) => void | Promise<void>;
 }
 
 type F = {
