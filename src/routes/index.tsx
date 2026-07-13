@@ -155,22 +155,25 @@ function KanbanPage() {
       <SaleForm
         open={!!pendingSale}
         onOpenChange={(o) => {
-          if (!o && pendingSale) {
-            // dialog closed without success — leave lead on previous stage
-            toast.info("Movimentação cancelada. O lead permanece na etapa anterior.");
+          if (!o) {
+            if (pendingSaleSaved.current) {
+              pendingSaleSaved.current = false;
+            } else if (pendingSale) {
+              toast.info("Movimentação cancelada. O lead permanece na etapa anterior.");
+            }
             setPendingSale(null);
           }
         }}
         defaultLeadId={pendingSale?.lead.id ?? null}
         onSaved={async (sale) => {
           if (!pendingSale) return;
+          pendingSaleSaved.current = true;
           const status = sale.payment_status;
           let target: EtapaFunil = pendingSale.fromStage;
           if (status === "pago") target = "venda_ganha";
           else if (status === "aguardando" || status === "parcial") target = "aguardando_pagamento";
           else if (status === "cancelado" || status === "reembolsado") target = pendingSale.fromStage;
           await moveLead(pendingSale.lead, target);
-          setPendingSale(null);
         }}
       />
 
