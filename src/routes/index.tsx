@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -47,6 +47,43 @@ function KanbanPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const pendingSaleSaved = useRef(false);
+
+  // Click-and-drag panning for the horizontal Kanban scroller — grab anywhere
+  // on the board background (not a card, not a button) and drag left/right,
+  // no scrollbar needed.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const pan = useRef({ dragging: false, startX: 0, startScrollLeft: 0 });
+
+  const onPanMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Block-list, not allow-list: panning starts from anywhere on the board
+    // EXCEPT cards and interactive controls, since the scroller wraps everything
+    // and an allow-list check via closest() would always match the outer div.
+    if ((e.target as HTMLElement).closest("[data-no-pan], button, a, input, textarea, select")) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    pan.current = { dragging: true, startX: e.clientX, startScrollLeft: el.scrollLeft };
+    el.classList.add("cursor-grabbing");
+    e.preventDefault(); // avoid text selection while panning
+  };
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      if (!pan.current.dragging) return;
+      el.scrollLeft = pan.current.startScrollLeft - (e.clientX - pan.current.startX);
+    };
+    const onUp = () => {
+      if (pan.current.dragging) el.classList.remove("cursor-grabbing");
+      pan.current.dragging = false;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
@@ -113,7 +150,11 @@ function KanbanPage() {
       <FiltersBar value={filters} onChange={setFilters} allTags={allTags} />
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div className="overflow-x-auto pb-4">
+        <div
+          ref={scrollerRef}
+          onMouseDown={onPanMouseDown}
+          className="cursor-grab overflow-x-auto pb-4 select-none"
+        >
           <div className="flex w-max gap-3">
             {ETAPAS.map((stage) => {
               const items = filtered.filter((l) => l.etapa_funil === stage.id);

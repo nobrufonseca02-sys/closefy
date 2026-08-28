@@ -23,6 +23,7 @@ export function LeadCard({ lead, onOpen, onRegisterSale }: Props) {
     <div
       ref={setNodeRef}
       style={style}
+      data-no-pan
       className={
         "group rounded-lg border bg-card p-3 shadow-sm transition hover:shadow-md " +
         (isDragging ? "opacity-40 cursor-grabbing" : "cursor-grab")
