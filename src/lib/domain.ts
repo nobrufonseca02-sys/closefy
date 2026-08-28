@@ -66,17 +66,17 @@ export interface LeadFeedback {
   updated_at: string;
 }
 
-export const ETAPAS: { id: EtapaFunil; label: string }[] = [
-  { id: "prospectando", label: "Iniciado / Prospectando" },
-  { id: "conectado", label: "Conectado" },
-  { id: "qualificado", label: "Qualificado" },
-  { id: "call_agendada", label: "Reunião agendada" },
-  { id: "reuniao_realizada", label: "Reunião realizada" },
-  { id: "em_fechamento", label: "Proposta / Em fechamento" },
-  { id: "followup", label: "Follow-up" },
-  { id: "aguardando_pagamento", label: "Aguardando pagamento" },
-  { id: "venda_ganha", label: "Venda ganha" },
-  { id: "venda_perdida", label: "Venda perdida" },
+export const ETAPAS: { id: EtapaFunil; label: string; desc: string; fase: "pre_venda" | "venda" }[] = [
+  { id: "prospectando", label: "Iniciados", desc: "A conta entrou formalmente no fluxo de prospecção.", fase: "pre_venda" },
+  { id: "conectado", label: "Conectados", desc: "Houve acesso real: resposta, interação ou indicação interna.", fase: "pre_venda" },
+  { id: "qualificado", label: "Qualificados", desc: "Aderência suficiente entre empresa, problema e capacidade de compra.", fase: "pre_venda" },
+  { id: "call_agendada", label: "Reunião agendada", desc: "Data e horário definidos.", fase: "pre_venda" },
+  { id: "reuniao_realizada", label: "Reunião realizada", desc: "A conversa efetivamente aconteceu.", fase: "pre_venda" },
+  { id: "em_fechamento", label: "Proposta", desc: "Proposta comercial apresentada.", fase: "venda" },
+  { id: "followup", label: "Follow-up", desc: "Retomada ativa após a proposta.", fase: "venda" },
+  { id: "aguardando_pagamento", label: "Aguardando pagamento", desc: "Fechamento acordado, pagamento pendente.", fase: "venda" },
+  { id: "venda_ganha", label: "Ganho", desc: "Venda conquistada.", fase: "venda" },
+  { id: "venda_perdida", label: "Perdido", desc: "Oportunidade encerrada sem venda.", fase: "venda" },
 ];
 
 export const TEMPERATURAS: { id: Temperatura; label: string; color: string }[] = [
