@@ -145,7 +145,7 @@ function KanbanPage() {
             })}
           </div>
           <div className="mt-2 flex w-max gap-3">
-            <div className="flex w-[1436px] shrink-0 flex-col items-center">
+            <div className="flex w-[1448px] shrink-0 flex-col items-center">
               <div className="h-2 w-full rounded-b-md border-x-2 border-b-2 border-primary/40" />
               <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
                 Responsabilidade do pré-vendedor
@@ -226,23 +226,33 @@ function KanbanPage() {
 }
 
 function Column({
-  id, label, count, children, onAdd,
+  id, label, desc, fase, count, children, onAdd,
 }: {
   id: string;
   label: string;
+  desc?: string;
+  fase?: "pre_venda" | "venda";
   count: number;
   children: React.ReactNode;
   onAdd: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div className="flex w-[280px] shrink-0 flex-col rounded-xl bg-muted/40">
-      <div className="flex items-center justify-between px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{label}</span>
-          <span className="rounded-full bg-background px-1.5 py-0.5 text-xs text-muted-foreground">{count}</span>
+    <div
+      className={
+        "flex w-[280px] shrink-0 flex-col rounded-xl " +
+        (fase === "pre_venda" ? "bg-primary/5 ring-1 ring-primary/15" : "bg-muted/40")
+      }
+    >
+      <div className="flex items-start justify-between gap-2 px-3 py-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">{label}</span>
+            <span className="rounded-full bg-background px-1.5 py-0.5 text-xs text-muted-foreground">{count}</span>
+          </div>
+          {desc && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{desc}</p>}
         </div>
-        <button onClick={onAdd} className="rounded-md text-xs text-muted-foreground hover:text-foreground" aria-label="Adicionar lead">
+        <button onClick={onAdd} className="shrink-0 rounded-md text-xs text-muted-foreground hover:text-foreground" aria-label="Adicionar lead">
           + novo
         </button>
       </div>
