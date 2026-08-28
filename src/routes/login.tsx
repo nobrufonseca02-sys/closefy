@@ -60,7 +60,7 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>HighTicket Closer</CardTitle>
+          <CardTitle>Closefy</CardTitle>
           <CardDescription>
             {mode === "signin" ? "Entre com sua conta para acessar o painel." : "Crie a conta única deste painel."}
           </CardDescription>

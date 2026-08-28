@@ -59,8 +59,8 @@ export function AppShell({ children, onNewLead, primaryAction, onImportCsv }: Pr
       <header className="sticky top-0 z-30 border-b bg-card/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-4">
           <div className="flex items-center gap-2">
-            <div className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-sm">HT</div>
-            <span className="font-semibold tracking-tight">HighTicket Closer</span>
+            <div className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-sm">C</div>
+            <span className="font-semibold tracking-tight">Closefy</span>
           </div>
           <nav className="ml-4 flex items-center gap-1">
             <Link to="/">

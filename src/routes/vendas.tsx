@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/vendas")({
   component: VendasPage,
-  head: () => ({ meta: [{ title: "Vendas e Comissões · HighTicket Closer" }] }),
+  head: () => ({ meta: [{ title: "Vendas e Comissões · Closefy" }] }),
 });
 
 const PAID_STATUSES: PaymentStatus[] = ["pago"];

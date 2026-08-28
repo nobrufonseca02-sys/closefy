@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/links")({
   component: LinksPage,
-  head: () => ({ meta: [{ title: "Central de Links · HighTicket Closer" }] }),
+  head: () => ({ meta: [{ title: "Central de Links · Closefy" }] }),
 });
 
 function LinksPage() {
