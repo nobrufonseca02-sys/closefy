@@ -164,8 +164,10 @@ export type Database = {
           email: string | null
           etapa_funil: string
           faturamento_medio: string | null
+          hipotese_dor: string | null
           id: string
           link_reuniao: string | null
+          motivo_perda: string | null
           nome_cliente: string
           nome_empresa: string
           numero_funcionarios: string | null
@@ -186,8 +188,10 @@ export type Database = {
           email?: string | null
           etapa_funil?: string
           faturamento_medio?: string | null
+          hipotese_dor?: string | null
           id?: string
           link_reuniao?: string | null
+          motivo_perda?: string | null
           nome_cliente: string
           nome_empresa: string
           numero_funcionarios?: string | null
@@ -208,8 +212,10 @@ export type Database = {
           email?: string | null
           etapa_funil?: string
           faturamento_medio?: string | null
+          hipotese_dor?: string | null
           id?: string
           link_reuniao?: string | null
+          motivo_perda?: string | null
           nome_cliente?: string
           nome_empresa?: string
           numero_funcionarios?: string | null
