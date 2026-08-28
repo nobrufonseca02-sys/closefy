@@ -1,13 +1,29 @@
 export type Temperatura = "quente" | "morno" | "frio" | "precisa_qualificacao";
 export type EtapaFunil =
   | "prospectando"
+  | "conectado"
+  | "qualificado"
   | "call_agendada"
+  | "reuniao_realizada"
   | "em_fechamento"
   | "followup"
   | "aguardando_pagamento"
   | "venda_ganha"
   | "venda_perdida";
 export type SLAStatus = "em_dia" | "atencao" | "vencido" | "na";
+
+// Hipótese de dor usada na abordagem — alinhado às 5 portas de entrada do
+// Plano de Go-to-Market da ByBrain (Bloco 2/3). Obrigatório registrar por lead
+// para que as taxas de conversão por dor sejam mensuráveis (Bloco 5/7).
+export const HIPOTESES_DOR = [
+  "Garantia de Conciliação",
+  "Reestruturação Financeira",
+  "Controle Orçamentário",
+  "Rentabilidade",
+  "Gestão de Inadimplentes",
+  "Outra",
+] as const;
+export type HipoteseDor = (typeof HIPOTESES_DOR)[number];
 
 export interface Lead {
   id: string;
@@ -22,6 +38,8 @@ export interface Lead {
   temperatura: Temperatura;
   etapa_funil: EtapaFunil;
   origem: string | null;
+  hipotese_dor: string | null;
+  motivo_perda: string | null;
   link_reuniao: string | null;
   data_proxima_reuniao: string | null;
   data_followup: string | null;
@@ -49,9 +67,12 @@ export interface LeadFeedback {
 }
 
 export const ETAPAS: { id: EtapaFunil; label: string }[] = [
-  { id: "prospectando", label: "Em atendimento / Prospectando" },
-  { id: "call_agendada", label: "Call agendada" },
-  { id: "em_fechamento", label: "Em fechamento" },
+  { id: "prospectando", label: "Iniciado / Prospectando" },
+  { id: "conectado", label: "Conectado" },
+  { id: "qualificado", label: "Qualificado" },
+  { id: "call_agendada", label: "Reunião agendada" },
+  { id: "reuniao_realizada", label: "Reunião realizada" },
+  { id: "em_fechamento", label: "Proposta / Em fechamento" },
   { id: "followup", label: "Follow-up" },
   { id: "aguardando_pagamento", label: "Aguardando pagamento" },
   { id: "venda_ganha", label: "Venda ganha" },

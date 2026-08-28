@@ -48,6 +48,18 @@ export function useUpdateLead() {
   });
 }
 
+export function useImportLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<Lead>[]) => {
+      const { data, error } = await supabase.from("leads").insert(payload as never).select();
+      if (error) throw error;
+      return (data ?? []) as Lead[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: leadsKey }),
+  });
+}
+
 export function useDeleteLead() {
   const qc = useQueryClient();
   return useMutation({

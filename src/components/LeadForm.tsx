@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ETAPAS, TEMPERATURAS, type EtapaFunil, type Lead, type Temperatura } from "@/lib/domain";
+import { ETAPAS, HIPOTESES_DOR, TEMPERATURAS, type EtapaFunil, type Lead, type Temperatura } from "@/lib/domain";
 import { useCreateLead, useUpdateLead } from "@/lib/leads-api";
 import { TagsInput } from "./TagsInput";
 import { toast } from "sonner";
@@ -29,6 +29,8 @@ type FormState = {
   temperatura: Temperatura;
   etapa_funil: EtapaFunil;
   origem: string;
+  hipotese_dor: string;
+  motivo_perda: string;
   link_reuniao: string;
   data_proxima_reuniao: string;
   data_followup: string;
@@ -48,6 +50,8 @@ const empty = (stage?: EtapaFunil): FormState => ({
   temperatura: "precisa_qualificacao",
   etapa_funil: stage ?? "prospectando",
   origem: "",
+  hipotese_dor: "",
+  motivo_perda: "",
   link_reuniao: "",
   data_proxima_reuniao: "",
   data_followup: "",
@@ -82,6 +86,8 @@ export function LeadForm({ open, onOpenChange, lead, defaultStage }: Props) {
           temperatura: lead.temperatura,
           etapa_funil: lead.etapa_funil,
           origem: lead.origem ?? "",
+          hipotese_dor: lead.hipotese_dor ?? "",
+          motivo_perda: lead.motivo_perda ?? "",
           link_reuniao: lead.link_reuniao ?? "",
           data_proxima_reuniao: toInput(lead.data_proxima_reuniao),
           data_followup: toInput(lead.data_followup),
@@ -111,6 +117,8 @@ export function LeadForm({ open, onOpenChange, lead, defaultStage }: Props) {
       temperatura: f.temperatura,
       etapa_funil: f.etapa_funil,
       origem: f.origem || null,
+      hipotese_dor: f.hipotese_dor || null,
+      motivo_perda: f.motivo_perda || null,
       link_reuniao: f.link_reuniao || null,
       data_proxima_reuniao: f.data_proxima_reuniao ? new Date(f.data_proxima_reuniao).toISOString() : null,
       data_followup: f.data_followup ? new Date(f.data_followup).toISOString() : null,
@@ -181,6 +189,24 @@ export function LeadForm({ open, onOpenChange, lead, defaultStage }: Props) {
               </SelectContent>
             </Select>
           </Field>
+          <Field label="Hipótese de dor" className="col-span-2">
+            <Select value={f.hipotese_dor || undefined} onValueChange={(v) => setF({ ...f, hipotese_dor: v })}>
+              <SelectTrigger><SelectValue placeholder="Qual dor está sendo testada nesta abordagem?" /></SelectTrigger>
+              <SelectContent>
+                {HIPOTESES_DOR.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {f.etapa_funil === "venda_perdida" && (
+            <Field label="Motivo da perda" className="col-span-2">
+              <Textarea
+                rows={2}
+                value={f.motivo_perda}
+                onChange={(e) => setF({ ...f, motivo_perda: e.target.value })}
+                placeholder="Por que este lead não avançou? (obrigatório para aprendizado do funil)"
+              />
+            </Field>
+          )}
           <Field label="Link da reunião" className="col-span-2">
             <Input value={f.link_reuniao} onChange={(e) => setF({ ...f, link_reuniao: e.target.value })} />
           </Field>

@@ -15,6 +15,7 @@ import { LeadForm } from "@/components/LeadForm";
 import { LeadDetail } from "@/components/LeadDetail";
 import { LeadCard } from "@/components/LeadCard";
 import { SaleForm } from "@/components/SaleForm";
+import { ImportLeadsDialog } from "@/components/ImportLeadsDialog";
 import { FiltersBar, defaultFilters, type FiltersState } from "@/components/FiltersBar";
 import { useLeads, useUpdateLead } from "@/lib/leads-api";
 import { useSales } from "@/lib/commerce-api";
@@ -37,6 +38,7 @@ function KanbanPage() {
   const [detail, setDetail] = useState<Lead | null>(null);
   const [filters, setFilters] = useState<FiltersState>(defaultFilters);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   // Sale-on-drop pending state
   const [pendingSale, setPendingSale] = useState<{ lead: Lead; fromStage: EtapaFunil } | null>(null);
@@ -107,7 +109,7 @@ function KanbanPage() {
   };
 
   return (
-    <AppShell onNewLead={() => openNew()}>
+    <AppShell onNewLead={() => openNew()} onImportCsv={() => setImportOpen(true)}>
       <FiltersBar value={filters} onChange={setFilters} allTags={allTags} />
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -146,6 +148,7 @@ function KanbanPage() {
       {isLoading && <div className="py-8 text-center text-sm text-muted-foreground">Carregando...</div>}
 
       <LeadForm open={formOpen} onOpenChange={setFormOpen} lead={editing} defaultStage={defaultStage} />
+      <ImportLeadsDialog open={importOpen} onOpenChange={setImportOpen} />
       <LeadDetail
         lead={detailLive}
         onOpenChange={(o) => !o && setDetail(null)}

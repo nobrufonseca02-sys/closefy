@@ -10,7 +10,7 @@ import { Copy, DollarSign, ExternalLink, History, Pencil, Plus, Trash2 } from "l
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  ETAPAS, SLA_STYLES, TEMPERATURAS, calcSLA, etapaLabel, formatCurrency,
+  ETAPAS, HIPOTESES_DOR, SLA_STYLES, TEMPERATURAS, calcSLA, etapaLabel, formatCurrency,
   formatDate, relativeTime, tempStyle,
   type EtapaFunil, type Lead, type Temperatura,
 } from "@/lib/domain";
@@ -132,6 +132,29 @@ export function LeadDetail({ lead, onOpenChange, onEdit }: Props) {
                 onBlur={(e) => quickPatch({ data_followup: e.target.value ? new Date(e.target.value).toISOString() : null })}
               />
             </div>
+            <div className="col-span-2 space-y-1">
+              <Label className="text-xs text-muted-foreground">Hipótese de dor</Label>
+              <Select
+                value={lead.hipotese_dor ?? undefined}
+                onValueChange={(v) => quickPatch({ hipotese_dor: v })}
+              >
+                <SelectTrigger className="h-8"><SelectValue placeholder="Não definida" /></SelectTrigger>
+                <SelectContent>
+                  {HIPOTESES_DOR.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            {lead.etapa_funil === "venda_perdida" && (
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs text-muted-foreground">Motivo da perda</Label>
+                <Textarea
+                  rows={2}
+                  defaultValue={lead.motivo_perda ?? ""}
+                  onBlur={(e) => quickPatch({ motivo_perda: e.target.value || null })}
+                  placeholder="Por que este lead não avançou?"
+                />
+              </div>
+            )}
             <div className="col-span-2 space-y-1">
               <Label className="text-xs text-muted-foreground">Link da reunião</Label>
               <Input
