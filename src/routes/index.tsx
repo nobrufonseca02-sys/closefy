@@ -39,6 +39,9 @@ function KanbanPage() {
   const [filters, setFilters] = useState<FiltersState>(defaultFilters);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<EtapaFunil | null>(null);
+  const [bulkTarget, setBulkTarget] = useState<EtapaFunil | "">("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Sale-on-drop pending state
   const [pendingSale, setPendingSale] = useState<{ lead: Lead; fromStage: EtapaFunil } | null>(null);
