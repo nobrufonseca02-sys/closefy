@@ -225,6 +225,11 @@ function KanbanPage() {
                   fase={stage.fase}
                   count={items.length}
                   onAdd={() => openNew(stage.id)}
+                  selected={selectedStage === stage.id}
+                  onToggleSelect={() => {
+                    setBulkTarget("");
+                    setSelectedStage((cur) => (cur === stage.id ? null : stage.id));
+                  }}
                 >
                   {items.map((l) => (
                     <LeadCard
