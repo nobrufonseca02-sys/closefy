@@ -1,14 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { LeadForm } from "@/components/LeadForm";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { DollarSign, Handshake, Package, TrendingDown, TrendingUp, UserPlus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ArrowRight, Clock, DollarSign, Flame, Target, Trophy, Wallet } from "lucide-react";
 import { useLeads } from "@/lib/leads-api";
 import { useSales } from "@/lib/commerce-api";
 import { formatBRL } from "@/lib/commerce-domain";
-import { relativeTime } from "@/lib/domain";
+import { formatCurrency } from "@/lib/domain";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
 });
 
-// --- Comparação mês atual x mês anterior, usada nos cards de KPI ---
+// --- Comparação mês atual x mês anterior, usada nos badges de variação ---
 
 function monthRange(monthsAgo: number) {
   const now = new Date();
@@ -33,17 +33,14 @@ function inRange(iso: string, start: number, end: number) {
 
 interface Delta {
   text: string;
-  tone: "up" | "down" | "neutral";
+  tone: "up" | "down";
 }
 
-function buildDelta(curr: number, prev: number): Delta {
-  if (prev === 0) {
-    if (curr === 0) return { text: "Sem variação vs mês passado", tone: "neutral" };
-    return { text: "Novo neste mês", tone: "up" };
-  }
+function buildDelta(curr: number, prev: number): Delta | undefined {
+  if (prev === 0) return curr === 0 ? undefined : { text: "Novo no mês", tone: "up" };
   const pct = ((curr - prev) / prev) * 100;
   const sign = pct >= 0 ? "+" : "";
-  return { text: `${sign}${pct.toFixed(0)}% vs mês passado`, tone: pct >= 0 ? "up" : "down" };
+  return { text: `${sign}${pct.toFixed(0)}%`, tone: pct >= 0 ? "up" : "down" };
 }
 
 function DashboardPage() {
@@ -54,208 +51,94 @@ function DashboardPage() {
   const stats = useMemo(() => {
     const active = leads.filter((l) => l.etapa_funil !== "venda_ganha" && l.etapa_funil !== "venda_perdida");
     const quentes = active.filter((l) => l.temperatura === "quente");
+    const pagamento = leads.filter((l) => l.etapa_funil === "aguardando_pagamento");
     const ganhas = leads.filter((l) => l.etapa_funil === "venda_ganha");
-    return { active, quentes, ganhas };
+    const pipeline = active.reduce((s, l) => s + (l.ticket_estimado ?? 0), 0);
+    return { active, quentes, pagamento, ganhas, pipeline };
   }, [leads]);
 
-  // KPIs do topo: sempre mês corrente vs mês anterior, com dado real dos dois lados.
-  const kpis = useMemo(() => {
+  const salesStats = useMemo(() => {
+    const valid = sales.filter((s) => s.payment_status !== "cancelado" && s.payment_status !== "reembolsado");
+    const totalSold = valid.reduce((a, s) => a + Number(s.sale_value), 0);
+    const totalReceived = sales.reduce((a, s) => a + Number(s.amount_paid || (s.payment_status === "pago" ? s.sale_value : 0)), 0);
+    const totalPending = valid
+      .filter((s) => s.payment_status === "aguardando" || s.payment_status === "parcial" || s.payment_status === "inadimplente")
+      .reduce((a, s) => a + Number(s.sale_value) - Number(s.amount_paid || 0), 0);
+    const commissionPredicted = valid.reduce((a, s) => a + Number(s.commission_value), 0);
+    const commissionConfirmed = valid
+      .filter((s) => s.payment_status === "pago")
+      .reduce((a, s) => a + Number(s.commission_value), 0);
+    const paidCount = valid.filter((s) => s.payment_status === "pago").length;
+    const avgTicket = paidCount > 0 ? totalReceived / paidCount : 0;
+    return { totalSold, totalReceived, totalPending, commissionPredicted, commissionConfirmed, paidCount, avgTicket, count: valid.length };
+  }, [sales]);
+
+  // Variação mês atual x mês anterior — só pros números que dá pra comparar
+  // de forma honesta com o dado que já temos (sale_date / created_at).
+  // Cards sem contrapartida temporal confiável (ex.: "Leads ativos" é uma
+  // foto do agora, "Total recebido" mistura datas de venda e de pagamento)
+  // ficam sem badge, em vez de mostrar uma variação inventada.
+  const deltas = useMemo(() => {
     const cur = monthRange(0);
     const prev = monthRange(1);
     const validSales = sales.filter((s) => s.payment_status !== "cancelado" && s.payment_status !== "reembolsado");
-
     const curSales = validSales.filter((s) => inRange(s.sale_date, cur.start, cur.end));
     const prevSales = validSales.filter((s) => inRange(s.sale_date, prev.start, prev.end));
-    const curRevenue = curSales.reduce((a, s) => a + Number(s.sale_value), 0);
-    const prevRevenue = prevSales.reduce((a, s) => a + Number(s.sale_value), 0);
+    const paidCur = curSales.filter((s) => s.payment_status === "pago");
+    const paidPrev = prevSales.filter((s) => s.payment_status === "pago");
 
-    const curLeads = leads.filter((l) => inRange(l.created_at, cur.start, cur.end));
-    const prevLeads = leads.filter((l) => inRange(l.created_at, prev.start, prev.end));
+    const sum = (arr: typeof sales, field: "sale_value" | "commission_value") =>
+      arr.reduce((a, s) => a + Number(s[field]), 0);
 
-    const curTicket = curSales.length > 0 ? curRevenue / curSales.length : 0;
-    const prevTicket = prevSales.length > 0 ? prevRevenue / prevSales.length : 0;
+    const curTicket = curSales.length > 0 ? sum(curSales, "sale_value") / curSales.length : 0;
+    const prevTicket = prevSales.length > 0 ? sum(prevSales, "sale_value") / prevSales.length : 0;
+
+    const curNewLeads = leads.filter((l) => inRange(l.created_at, cur.start, cur.end)).length;
+    const prevNewLeads = leads.filter((l) => inRange(l.created_at, prev.start, prev.end)).length;
 
     return {
-      revenue: { value: curRevenue, delta: buildDelta(curRevenue, prevRevenue) },
-      newLeads: { value: curLeads.length, delta: buildDelta(curLeads.length, prevLeads.length) },
-      closedSales: { value: curSales.length, delta: buildDelta(curSales.length, prevSales.length) },
-      avgTicket: { value: curTicket, delta: buildDelta(curTicket, prevTicket) },
+      leadsAtivos: buildDelta(curNewLeads, prevNewLeads),
+      totalVendido: buildDelta(sum(curSales, "sale_value"), sum(prevSales, "sale_value")),
+      ticketMedio: buildDelta(curTicket, prevTicket),
+      comissaoPrevista: buildDelta(sum(curSales, "commission_value"), sum(prevSales, "commission_value")),
+      comissaoConfirmada: buildDelta(sum(paidCur, "commission_value"), sum(paidPrev, "commission_value")),
+      vendasPeriodo: buildDelta(curSales.length, prevSales.length),
     };
-  }, [leads, sales]);
-
-  // Barras de "Estatísticas rápidas" — todas percentuais reais (0-100), sem invenção.
-  const quickStats = useMemo(() => {
-    const conversao = leads.length > 0 ? (stats.ganhas.length / leads.length) * 100 : 0;
-    const validSales = sales.filter((s) => s.payment_status !== "cancelado" && s.payment_status !== "reembolsado");
-    const pagas = validSales.length > 0
-      ? (validSales.filter((s) => s.payment_status === "pago").length / validSales.length) * 100
-      : 0;
-    const quentesPct = stats.active.length > 0 ? (stats.quentes.length / stats.active.length) * 100 : 0;
-    return { conversao, pagas, quentesPct };
-  }, [leads, sales, stats]);
-
-  // Ranking de produtos por receita — direto dos registros de venda, sem dado fictício.
-  const topProducts = useMemo(() => {
-    const totals = new Map<string, number>();
-    sales.forEach((s) => {
-      if (s.payment_status === "cancelado" || s.payment_status === "reembolsado") return;
-      totals.set(s.product_name, (totals.get(s.product_name) ?? 0) + Number(s.sale_value));
-    });
-    return Array.from(totals.entries())
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
-  }, [sales]);
-
-  // Atividade recente: só fatos novos (lead cadastrado, venda registrada) —
-  // sem log de movimentação entre etapas.
-  const recentActivity = useMemo(() => {
-    type Item = { key: string; at: string; kind: "lead" | "sale"; title: string; subtitle: string };
-    const items: Item[] = [];
-
-    leads.slice(0, 8).forEach((l) => {
-      items.push({
-        key: `lead-${l.id}`,
-        at: l.created_at,
-        kind: "lead",
-        title: "Novo lead cadastrado",
-        subtitle: `${l.nome_cliente} · ${l.nome_empresa}`,
-      });
-    });
-
-    [...sales]
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 8)
-      .forEach((s) => {
-        items.push({
-          key: `sale-${s.id}`,
-          at: s.created_at,
-          kind: "sale",
-          title: "Venda registrada",
-          subtitle: `${s.client_name} · ${formatBRL(Number(s.sale_value))}`,
-        });
-      });
-
-    return items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 6);
   }, [leads, sales]);
 
   return (
     <AppShell onNewLead={() => setFormOpen(true)}>
-      <h1 className="mb-4 text-xl font-semibold tracking-tight">Dashboard comercial</h1>
+      <h1 className="mb-5 text-xl font-semibold tracking-tight">Dashboard comercial</h1>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <KpiCard
-          icon={<DollarSign className="size-4" />}
-          color="blue"
-          label="Total vendido (mês)"
-          value={formatBRL(kpis.revenue.value)}
-          delta={kpis.revenue.delta}
-        />
-        <KpiCard
-          icon={<UserPlus className="size-4" />}
-          color="green"
-          label="Novos leads (mês)"
-          value={kpis.newLeads.value}
-          delta={kpis.newLeads.delta}
-        />
-        <KpiCard
-          icon={<Handshake className="size-4" />}
-          color="purple"
-          label="Vendas fechadas (mês)"
-          value={kpis.closedSales.value}
-          delta={kpis.closedSales.delta}
-        />
-        <KpiCard
-          icon={<Package className="size-4" />}
-          color="orange"
-          label="Ticket médio (mês)"
-          value={formatBRL(kpis.avgTicket.value)}
-          delta={kpis.avgTicket.delta}
-        />
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pipeline</h2>
+        <Link to="/" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/90">
+          Ver leads <ArrowRight className="size-3" />
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard icon={<Target className="size-3.5" />} label="Leads ativos" value={stats.active.length} delta={deltas.leadsAtivos} />
+        <StatCard icon={<Flame className="size-3.5" />} label="Leads quentes" value={stats.quentes.length} tone="hot" />
+        <StatCard icon={<Wallet className="size-3.5" />} label="Aguardando pagamento" value={stats.pagamento.length} />
+        <StatCard icon={<DollarSign className="size-3.5" />} label="Pipeline potencial" value={formatCurrency(stats.pipeline)} />
+        <StatCard icon={<Trophy className="size-3.5" />} label="Vendas ganhas" value={stats.ganhas.length} tone="success" />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardContent className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold">Atividade recente</h3>
-              <Badge variant="secondary">{recentActivity.length}</Badge>
-            </div>
-            {recentActivity.length === 0 ? (
-              <div className="rounded-md border border-dashed py-6 text-center text-sm text-muted-foreground">
-                Nenhuma atividade ainda
-              </div>
-            ) : (
-              <ul className="divide-y">
-                {recentActivity.map((item) => (
-                  <li key={item.key} className="flex items-center gap-3 py-2.5">
-                    <div
-                      className={
-                        "grid size-8 shrink-0 place-items-center rounded-full " +
-                        (item.kind === "lead" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600")
-                      }
-                    >
-                      {item.kind === "lead" ? <UserPlus className="size-3.5" /> : <DollarSign className="size-3.5" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">{item.title}</div>
-                      <div className="truncate text-xs text-muted-foreground">{item.subtitle}</div>
-                    </div>
-                    <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(item.at)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <h3 className="mb-3 font-semibold">Estatísticas rápidas</h3>
-              <div className="flex flex-col gap-3">
-                <QuickStatRow
-                  label="Taxa de conversão"
-                  valueLabel={`${quickStats.conversao.toFixed(1)}%`}
-                  pct={quickStats.conversao}
-                  barClassName="bg-primary"
-                />
-                <QuickStatRow
-                  label="Vendas pagas"
-                  valueLabel={`${quickStats.pagas.toFixed(0)}%`}
-                  pct={quickStats.pagas}
-                  barClassName="bg-success"
-                />
-                <QuickStatRow
-                  label="Leads quentes no pipeline"
-                  valueLabel={`${quickStats.quentesPct.toFixed(0)}%`}
-                  pct={quickStats.quentesPct}
-                  barClassName="bg-hot"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <h3 className="mb-3 font-semibold">Produtos mais vendidos</h3>
-              {topProducts.length === 0 ? (
-                <div className="rounded-md border border-dashed py-4 text-center text-sm text-muted-foreground">
-                  Nenhuma venda ainda
-                </div>
-              ) : (
-                <ul className="flex flex-col gap-2.5">
-                  {topProducts.map((p) => (
-                    <li key={p.name} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate text-muted-foreground">{p.name}</span>
-                      <span className="shrink-0 font-medium">{formatBRL(p.total)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <div className="mt-7 mb-3 flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Financeiro</h2>
+        <Link to="/vendas" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/90">
+          Ver vendas <ArrowRight className="size-3" />
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard icon={<DollarSign className="size-3.5" />} label="Total vendido" value={formatBRL(salesStats.totalSold)} delta={deltas.totalVendido} />
+        <StatCard icon={<Wallet className="size-3.5" />} label="Total recebido" value={formatBRL(salesStats.totalReceived)} tone="success" />
+        <StatCard icon={<Clock className="size-3.5" />} label="Aguardando pagamento" value={formatBRL(salesStats.totalPending)} tone="warning" />
+        <StatCard icon={<Trophy className="size-3.5" />} label="Ticket médio" value={formatBRL(salesStats.avgTicket)} delta={deltas.ticketMedio} />
+        <StatCard icon={<DollarSign className="size-3.5" />} label="Comissão prevista" value={formatBRL(salesStats.commissionPredicted)} delta={deltas.comissaoPrevista} />
+        <StatCard icon={<DollarSign className="size-3.5" />} label="Comissão confirmada" value={formatBRL(salesStats.commissionConfirmed)} tone="success" delta={deltas.comissaoConfirmada} />
+        <StatCard icon={<Trophy className="size-3.5" />} label="Vendas do período" value={salesStats.count} delta={deltas.vendasPeriodo} />
+        <StatCard icon={<Wallet className="size-3.5" />} label="Leads aguardando pgto" value={stats.pagamento.length} />
       </div>
 
       <LeadForm open={formOpen} onOpenChange={setFormOpen} />
@@ -263,68 +146,44 @@ function DashboardPage() {
   );
 }
 
-const KPI_COLORS = {
-  blue: "bg-blue-100 text-blue-600",
-  green: "bg-green-100 text-green-600",
-  purple: "bg-purple-100 text-purple-600",
-  orange: "bg-orange-100 text-orange-600",
-} as const;
+const TONE_STYLES: Record<"success" | "warning" | "danger" | "hot" | "default", { card: string; icon: string }> = {
+  success: { card: "border-success/30 bg-success/5", icon: "text-success" },
+  warning: { card: "border-warning/40 bg-warning/10", icon: "text-warning-foreground" },
+  danger: { card: "border-danger/30 bg-danger/5", icon: "text-danger" },
+  hot: { card: "", icon: "text-hot" },
+  default: { card: "", icon: "" },
+};
 
-function KpiCard({
-  icon, color, label, value, delta,
+function StatCard({
+  icon, label, value, delta, tone = "default",
 }: {
   icon: React.ReactNode;
-  color: keyof typeof KPI_COLORS;
   label: string;
   value: number | string;
-  delta: Delta;
+  delta?: Delta;
+  tone?: keyof typeof TONE_STYLES;
 }) {
+  const t = TONE_STYLES[tone];
   return (
-    <Card>
+    <Card className={cn("gap-0 py-0", t.card)}>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className={`grid size-9 place-items-center rounded-lg ${KPI_COLORS[color]}`}>{icon}</div>
-          {delta.tone !== "neutral" && (
-            delta.tone === "up"
-              ? <TrendingUp className="size-4 text-success" />
-              : <TrendingDown className="size-4 text-danger" />
+        <div className="flex items-start justify-between gap-2">
+          <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-xs font-medium text-muted-foreground">
+            <span className={t.icon}>{icon}</span> <span className="truncate">{label}</span>
+          </span>
+          {delta && (
+            <span
+              className={cn(
+                "shrink-0 text-xs font-medium",
+                delta.tone === "up" ? "text-success" : "text-danger",
+              )}
+            >
+              {delta.text}
+            </span>
           )}
         </div>
-        <div className="mt-3 text-xs text-muted-foreground">{label}</div>
-        <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
-        <div
-          className={
-            "mt-1 text-xs font-medium " +
-            (delta.tone === "up" ? "text-success" : delta.tone === "down" ? "text-danger" : "text-muted-foreground")
-          }
-        >
-          {delta.text}
-        </div>
+        <div className="mt-1.5 text-2xl font-semibold tracking-tight">{value}</div>
       </CardContent>
     </Card>
-  );
-}
-
-function QuickStatRow({
-  label, valueLabel, pct, barClassName,
-}: {
-  label: string;
-  valueLabel: string;
-  pct: number;
-  barClassName: string;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-semibold">{valueLabel}</span>
-      </div>
-      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full ${barClassName}`}
-          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-        />
-      </div>
-    </div>
   );
 }
