@@ -78,6 +78,7 @@ export const ETAPAS: { id: EtapaFunil; label: string; desc: string; fase: "pre_v
   { id: "aguardando_pagamento", label: "Aguardando pagamento", desc: "Fechamento acordado, pagamento pendente.", fase: "venda" },
   { id: "venda_ganha", label: "Ganho", desc: "Venda conquistada.", fase: "venda" },
   { id: "venda_perdida", label: "Perdido", desc: "Oportunidade encerrada sem venda.", fase: "venda" },
+  { id: "base", label: "Base", desc: "Contas guardadas na base para retomada futura.", fase: "venda" },
 ];
 
 export const TEMPERATURAS: { id: Temperatura; label: string; color: string }[] = [
@@ -102,7 +103,7 @@ export function hoursSince(iso: string | null | undefined): number {
 
 export function calcSLA(lead: Lead): SLAStatus {
   const stage = lead.etapa_funil;
-  if (stage === "venda_ganha" || stage === "venda_perdida") return "na";
+  if (stage === "venda_ganha" || stage === "venda_perdida" || stage === "base") return "na";
 
   const idle = hoursSince(lead.ultima_atividade_em);
 
@@ -130,7 +131,7 @@ export function calcSLA(lead: Lead): SLAStatus {
 }
 
 export function calcPriority(lead: Lead): number {
-  if (lead.etapa_funil === "venda_ganha" || lead.etapa_funil === "venda_perdida") return 0;
+  if (lead.etapa_funil === "venda_ganha" || lead.etapa_funil === "venda_perdida" || lead.etapa_funil === "base") return 0;
   let score = 0;
   if (lead.temperatura === "quente") score += 30;
   if ((lead.ticket_estimado ?? 0) > 30000) score += 20;
