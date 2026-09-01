@@ -7,9 +7,11 @@ interface Props {
   lead: Lead;
   onOpen: (l: Lead) => void;
   onRegisterSale?: (l: Lead) => void;
+  selected?: boolean;
+  onToggleSelected?: (l: Lead) => void;
 }
 
-export function LeadCard({ lead, onOpen, onRegisterSale }: Props) {
+export function LeadCard({ lead, onOpen, onRegisterSale, selected, onToggleSelected }: Props) {
   const sla = calcSLA(lead);
   const slaStyle = SLA_STYLES[sla];
   const temp = tempStyle(lead.temperatura);
@@ -26,11 +28,22 @@ export function LeadCard({ lead, onOpen, onRegisterSale }: Props) {
       data-no-pan
       className={
         "group rounded-lg border bg-card p-3 shadow-sm transition hover:shadow-md " +
+        (selected ? "ring-2 ring-primary border-primary " : "") +
         (isDragging ? "opacity-40 cursor-grabbing" : "cursor-grab")
       }
     >
-      <div className="flex items-start justify-between gap-2" {...attributes} {...listeners}>
-        <div className="min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-2">
+        {onToggleSelected && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelected(lead)}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[hsl(var(--primary))]"
+            aria-label={`Selecionar ${lead.nome_cliente}`}
+          />
+        )}
+        <div className="min-w-0 flex-1" {...attributes} {...listeners}>
           <div className="truncate text-sm font-semibold">{lead.nome_cliente}</div>
           <div className="truncate text-xs text-muted-foreground">{lead.nome_empresa}</div>
         </div>

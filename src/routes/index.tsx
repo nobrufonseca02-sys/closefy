@@ -42,7 +42,7 @@ function KanbanPage() {
   const [filters, setFilters] = useState<FiltersState>(defaultFilters);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [selectedStage, setSelectedStage] = useState<EtapaFunil | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkTarget, setBulkTarget] = useState<EtapaFunil | "">("");
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -148,10 +148,25 @@ function KanbanPage() {
     setFormOpen(true);
   };
 
-  const selectedLeads = selectedStage ? filtered.filter((l) => l.etapa_funil === selectedStage) : [];
+  const selectedLeads = filtered.filter((l) => selectedIds.has(l.id));
+
+  const toggleLead = (id: string) =>
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleColumn = (ids: string[], allSelected: boolean) =>
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      ids.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
 
   const runBulkMove = async () => {
-    if (!bulkTarget || !selectedStage || selectedLeads.length === 0) return;
+    if (!bulkTarget || selectedLeads.length === 0) return;
     setBulkBusy(true);
     const ids = selectedLeads.map((l) => l.id);
     const label = ETAPAS.find((x) => x.id === bulkTarget)?.label;
@@ -175,7 +190,7 @@ function KanbanPage() {
 
       await qc.invalidateQueries({ queryKey: leadsKey });
       toast.success(`${ids.length} lead(s) movidos para ${label}`);
-      setSelectedStage(null);
+      setSelectedIds(new Set());
       setBulkTarget("");
     } catch (e) {
       toast.error("Não foi possível migrar a coluna.", { description: (e as Error).message });
