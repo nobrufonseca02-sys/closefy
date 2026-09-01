@@ -330,7 +330,7 @@ function KanbanPage() {
 }
 
 function Column({
-  id, label, desc, fase, count, children, onAdd,
+  id, label, desc, fase, count, children, onAdd, selected, onToggleSelect,
 }: {
   id: string;
   label: string;
@@ -339,18 +339,29 @@ function Column({
   count: number;
   children: React.ReactNode;
   onAdd: () => void;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       className={
         "flex w-[280px] shrink-0 flex-col rounded-xl " +
+        (selected ? "ring-2 ring-primary bg-primary/10 " : "") +
         (fase === "pre_venda" ? "bg-primary/5 ring-1 ring-primary/15" : "bg-muted/40")
       }
     >
       <div className="flex items-start justify-between gap-2 px-3 py-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onToggleSelect?.()}
+              disabled={count === 0}
+              className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
+              aria-label={`Selecionar coluna ${label}`}
+            />
             <span className="text-sm font-semibold">{label}</span>
             <span className="rounded-full bg-background px-1.5 py-0.5 text-xs text-muted-foreground">{count}</span>
           </div>
@@ -360,6 +371,7 @@ function Column({
           + novo
         </button>
       </div>
+
       <div
         ref={setNodeRef}
         className={
