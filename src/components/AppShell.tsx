@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Kanban, LayoutDashboard, LogOut, Plus, Upload, Link2, DollarSign } from "lucide-react";
+import { Kanban, LayoutDashboard, LogOut, Plus, Upload, Link2, DollarSign, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useEffect, useState, type ReactNode } from "react";
@@ -46,7 +46,7 @@ function useRequireAuth() {
   return ready;
 }
 
-export function AppShell({ children, onNewLead, primaryAction, onImportCsv }: Props) {
+export function AppShell({ children, onNewLead, primaryAction, onImportCsv, selectMode, onToggleSelect }: Props) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const ready = useRequireAuth();
 
@@ -95,6 +95,16 @@ export function AppShell({ children, onNewLead, primaryAction, onImportCsv }: Pr
                 onClick={onImportCsv ?? (() => toast.info("Importação CSV em breve"))}
               >
                 <Upload className="size-4" /> Importar CSV
+              </Button>
+            )}
+            {pathname === "/" && onToggleSelect && (
+              <Button
+                variant={selectMode ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-2"
+                onClick={onToggleSelect}
+              >
+                <ListChecks className="size-4" /> {selectMode ? "Cancelar seleção" : "Selecionar"}
               </Button>
             )}
             {action && (

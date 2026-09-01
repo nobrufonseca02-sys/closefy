@@ -45,6 +45,19 @@ function KanbanPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkTarget, setBulkTarget] = useState<EtapaFunil | "">("");
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+
+  // Sair do modo seleção limpa qualquer seleção pendente, para não deixar
+  // leads "selecionados" escondidos quando os checkboxes somem de novo.
+  const toggleSelectMode = () =>
+    setSelectMode((cur) => {
+      const next = !cur;
+      if (!next) {
+        setSelectedIds(new Set());
+        setBulkTarget("");
+      }
+      return next;
+    });
 
   // Sale-on-drop pending state
   const [pendingSale, setPendingSale] = useState<{ lead: Lead; fromStage: EtapaFunil } | null>(null);
@@ -201,7 +214,12 @@ function KanbanPage() {
 
 
   return (
-    <AppShell onNewLead={() => openNew()} onImportCsv={() => setImportOpen(true)}>
+    <AppShell
+      onNewLead={() => openNew()}
+      onImportCsv={() => setImportOpen(true)}
+      selectMode={selectMode}
+      onToggleSelect={toggleSelectMode}
+    >
       <FiltersBar value={filters} onChange={setFilters} allTags={allTags} />
 
       {selectedLeads.length > 0 && (
@@ -256,6 +274,7 @@ function KanbanPage() {
                   fase={stage.fase}
                   count={items.length}
                   onAdd={() => openNew(stage.id)}
+                  selectMode={selectMode}
                   selected={items.length > 0 && items.every((l) => selectedIds.has(l.id))}
                   onToggleSelect={() =>
                     toggleColumn(
@@ -271,7 +290,7 @@ function KanbanPage() {
                       onOpen={setDetail}
                       onRegisterSale={(lead) => setSaleForLead(lead)}
                       selected={selectedIds.has(l.id)}
-                      onToggleSelected={(lead) => toggleLead(lead.id)}
+                      onToggleSelected={selectMode ? (lead) => toggleLead(lead.id) : undefined}
                     />
                   ))}
                   {items.length === 0 && (
@@ -365,7 +384,7 @@ function KanbanPage() {
 }
 
 function Column({
-  id, label, desc, fase, count, children, onAdd, selected, onToggleSelect,
+  id, label, desc, fase, count, children, onAdd, selected, onToggleSelect, selectMode,
 }: {
   id: string;
   label: string;
@@ -376,6 +395,7 @@ function Column({
   onAdd: () => void;
   selected?: boolean;
   onToggleSelect?: () => void;
+  selectMode?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
@@ -389,14 +409,16 @@ function Column({
       <div className="flex items-start justify-between gap-2 px-3 py-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={!!selected}
-              onChange={() => onToggleSelect?.()}
-              disabled={count === 0}
-              className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
-              aria-label={`Selecionar coluna ${label}`}
-            />
+            {selectMode && (
+              <input
+                type="checkbox"
+                checked={!!selected}
+                onChange={() => onToggleSelect?.()}
+                disabled={count === 0}
+                className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
+                aria-label={`Selecionar coluna ${label}`}
+              />
+            )}
             <span className="text-sm font-semibold">{label}</span>
             <span className="rounded-full bg-background px-1.5 py-0.5 text-xs text-muted-foreground">{count}</span>
           </div>
