@@ -42,7 +42,7 @@ function KanbanPage() {
   const [filters, setFilters] = useState<FiltersState>(defaultFilters);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [selectedStage, setSelectedStage] = useState<EtapaFunil | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkTarget, setBulkTarget] = useState<EtapaFunil | "">("");
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -148,10 +148,25 @@ function KanbanPage() {
     setFormOpen(true);
   };
 
-  const selectedLeads = selectedStage ? filtered.filter((l) => l.etapa_funil === selectedStage) : [];
+  const selectedLeads = filtered.filter((l) => selectedIds.has(l.id));
+
+  const toggleLead = (id: string) =>
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleColumn = (ids: string[], allSelected: boolean) =>
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      ids.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
 
   const runBulkMove = async () => {
-    if (!bulkTarget || !selectedStage || selectedLeads.length === 0) return;
+    if (!bulkTarget || selectedLeads.length === 0) return;
     setBulkBusy(true);
     const ids = selectedLeads.map((l) => l.id);
     const label = ETAPAS.find((x) => x.id === bulkTarget)?.label;
@@ -175,7 +190,7 @@ function KanbanPage() {
 
       await qc.invalidateQueries({ queryKey: leadsKey });
       toast.success(`${ids.length} lead(s) movidos para ${label}`);
-      setSelectedStage(null);
+      setSelectedIds(new Set());
       setBulkTarget("");
     } catch (e) {
       toast.error("Não foi possível migrar a coluna.", { description: (e as Error).message });
@@ -189,36 +204,35 @@ function KanbanPage() {
     <AppShell onNewLead={() => openNew()} onImportCsv={() => setImportOpen(true)}>
       <FiltersBar value={filters} onChange={setFilters} allTags={allTags} />
 
-      {selectedStage && (
+      {selectedLeads.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-          <span className="font-medium">
-            {selectedLeads.length} lead(s) selecionados em “{ETAPAS.find((x) => x.id === selectedStage)?.label}”
-          </span>
+          <span className="font-medium">{selectedLeads.length} lead(s) selecionados</span>
           <select
             value={bulkTarget}
             onChange={(e) => setBulkTarget(e.target.value as EtapaFunil)}
             className="rounded-md border bg-background px-2 py-1 text-sm"
           >
             <option value="">Mover para…</option>
-            {ETAPAS.filter((s) => s.id !== selectedStage).map((s) => (
+            {ETAPAS.map((s) => (
               <option key={s.id} value={s.id}>{s.label}</option>
             ))}
           </select>
           <button
             onClick={() => void runBulkMove()}
-            disabled={!bulkTarget || bulkBusy || selectedLeads.length === 0}
+            disabled={!bulkTarget || bulkBusy}
             className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
-            {bulkBusy ? "Movendo..." : "Migrar coluna"}
+            {bulkBusy ? "Movendo..." : "Mover selecionados"}
           </button>
           <button
-            onClick={() => { setSelectedStage(null); setBulkTarget(""); }}
+            onClick={() => { setSelectedIds(new Set()); setBulkTarget(""); }}
             className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:text-foreground"
           >
-            Cancelar
+            Limpar seleção
           </button>
         </div>
       )}
+
 
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -242,11 +256,13 @@ function KanbanPage() {
                   fase={stage.fase}
                   count={items.length}
                   onAdd={() => openNew(stage.id)}
-                  selected={selectedStage === stage.id}
-                  onToggleSelect={() => {
-                    setBulkTarget("");
-                    setSelectedStage((cur) => (cur === stage.id ? null : stage.id));
-                  }}
+                  selected={items.length > 0 && items.every((l) => selectedIds.has(l.id))}
+                  onToggleSelect={() =>
+                    toggleColumn(
+                      items.map((l) => l.id),
+                      items.length > 0 && items.every((l) => selectedIds.has(l.id)),
+                    )
+                  }
                 >
                   {items.map((l) => (
                     <LeadCard
@@ -254,6 +270,8 @@ function KanbanPage() {
                       lead={l}
                       onOpen={setDetail}
                       onRegisterSale={(lead) => setSaleForLead(lead)}
+                      selected={selectedIds.has(l.id)}
+                      onToggleSelected={(lead) => toggleLead(lead.id)}
                     />
                   ))}
                   {items.length === 0 && (
