@@ -10,6 +10,8 @@ interface Props {
   onNewLead?: () => void;
   primaryAction?: { label: string; onClick: () => void };
   onImportCsv?: () => void;
+  selectMode?: boolean;
+  onToggleSelect?: () => void;
 }
 
 /**
