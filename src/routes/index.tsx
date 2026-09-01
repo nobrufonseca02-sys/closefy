@@ -17,7 +17,9 @@ import { LeadCard } from "@/components/LeadCard";
 import { SaleForm } from "@/components/SaleForm";
 import { ImportLeadsDialog } from "@/components/ImportLeadsDialog";
 import { FiltersBar, defaultFilters, type FiltersState } from "@/components/FiltersBar";
-import { useLeads, useUpdateLead } from "@/lib/leads-api";
+import { useLeads, useUpdateLead, leadsKey } from "@/lib/leads-api";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSales } from "@/lib/commerce-api";
 import { recordLeadHistory } from "@/lib/tag-catalog-api";
 import { ETAPAS, calcSLA, type EtapaFunil, type Lead } from "@/lib/domain";
@@ -31,6 +33,7 @@ function KanbanPage() {
   const { data: leads = [], isLoading } = useLeads();
   const { data: sales = [] } = useSales();
   const update = useUpdateLead();
+  const qc = useQueryClient();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lead | null>(null);
