@@ -204,36 +204,35 @@ function KanbanPage() {
     <AppShell onNewLead={() => openNew()} onImportCsv={() => setImportOpen(true)}>
       <FiltersBar value={filters} onChange={setFilters} allTags={allTags} />
 
-      {selectedStage && (
+      {selectedLeads.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-          <span className="font-medium">
-            {selectedLeads.length} lead(s) selecionados em “{ETAPAS.find((x) => x.id === selectedStage)?.label}”
-          </span>
+          <span className="font-medium">{selectedLeads.length} lead(s) selecionados</span>
           <select
             value={bulkTarget}
             onChange={(e) => setBulkTarget(e.target.value as EtapaFunil)}
             className="rounded-md border bg-background px-2 py-1 text-sm"
           >
             <option value="">Mover para…</option>
-            {ETAPAS.filter((s) => s.id !== selectedStage).map((s) => (
+            {ETAPAS.map((s) => (
               <option key={s.id} value={s.id}>{s.label}</option>
             ))}
           </select>
           <button
             onClick={() => void runBulkMove()}
-            disabled={!bulkTarget || bulkBusy || selectedLeads.length === 0}
+            disabled={!bulkTarget || bulkBusy}
             className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
-            {bulkBusy ? "Movendo..." : "Migrar coluna"}
+            {bulkBusy ? "Movendo..." : "Mover selecionados"}
           </button>
           <button
-            onClick={() => { setSelectedStage(null); setBulkTarget(""); }}
+            onClick={() => { setSelectedIds(new Set()); setBulkTarget(""); }}
             className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:text-foreground"
           >
-            Cancelar
+            Limpar seleção
           </button>
         </div>
       )}
+
 
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
