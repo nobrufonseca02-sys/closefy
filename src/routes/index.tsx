@@ -17,7 +17,9 @@ import { LeadCard } from "@/components/LeadCard";
 import { SaleForm } from "@/components/SaleForm";
 import { ImportLeadsDialog } from "@/components/ImportLeadsDialog";
 import { FiltersBar, defaultFilters, type FiltersState } from "@/components/FiltersBar";
-import { useLeads, useUpdateLead } from "@/lib/leads-api";
+import { useLeads, useUpdateLead, leadsKey } from "@/lib/leads-api";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSales } from "@/lib/commerce-api";
 import { recordLeadHistory } from "@/lib/tag-catalog-api";
 import { ETAPAS, calcSLA, type EtapaFunil, type Lead } from "@/lib/domain";
@@ -31,6 +33,7 @@ function KanbanPage() {
   const { data: leads = [], isLoading } = useLeads();
   const { data: sales = [] } = useSales();
   const update = useUpdateLead();
+  const qc = useQueryClient();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lead | null>(null);
@@ -150,23 +153,37 @@ function KanbanPage() {
   const runBulkMove = async () => {
     if (!bulkTarget || !selectedStage || selectedLeads.length === 0) return;
     setBulkBusy(true);
-    let ok = 0;
-    for (const lead of selectedLeads) {
-      try {
-        await update.mutateAsync({ id: lead.id, patch: { etapa_funil: bulkTarget } });
-        await recordLeadHistory(lead.id, lead.etapa_funil, bulkTarget, "Migração em massa");
-        ok++;
-      } catch {
-        /* continua com os demais */
-      }
-    }
-    setBulkBusy(false);
+    const ids = selectedLeads.map((l) => l.id);
     const label = ETAPAS.find((x) => x.id === bulkTarget)?.label;
-    if (ok === selectedLeads.length) toast.success(`${ok} lead(s) movidos para ${label}`);
-    else toast.error(`${ok} de ${selectedLeads.length} leads movidos para ${label}`);
-    setSelectedStage(null);
-    setBulkTarget("");
+    try {
+      // Uma única chamada em lote (em vez de uma por lead) — move a coluna inteira
+      // praticamente instantaneamente. O histórico vai em um único insert.
+      const { error } = await supabase
+        .from("leads")
+        .update({ etapa_funil: bulkTarget } as never)
+        .in("id", ids);
+      if (error) throw error;
+
+      await supabase.from("lead_history" as never).insert(
+        selectedLeads.map((l) => ({
+          lead_id: l.id,
+          from_stage: l.etapa_funil,
+          to_stage: bulkTarget,
+          note: "Migração em massa",
+        })) as never,
+      );
+
+      await qc.invalidateQueries({ queryKey: leadsKey });
+      toast.success(`${ids.length} lead(s) movidos para ${label}`);
+      setSelectedStage(null);
+      setBulkTarget("");
+    } catch (e) {
+      toast.error("Não foi possível migrar a coluna.", { description: (e as Error).message });
+    } finally {
+      setBulkBusy(false);
+    }
   };
+
 
   return (
     <AppShell onNewLead={() => openNew()} onImportCsv={() => setImportOpen(true)}>
