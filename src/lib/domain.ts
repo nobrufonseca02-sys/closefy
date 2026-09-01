@@ -9,7 +9,8 @@ export type EtapaFunil =
   | "followup"
   | "aguardando_pagamento"
   | "venda_ganha"
-  | "venda_perdida";
+  | "venda_perdida"
+  | "base";
 export type SLAStatus = "em_dia" | "atencao" | "vencido" | "na";
 
 // Hipótese de dor usada na abordagem — alinhado às 5 portas de entrada do
