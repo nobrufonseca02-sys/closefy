@@ -108,9 +108,19 @@ export function formatBRL(v: number | null | undefined): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 }
 
+// Alíquota de impostos/deduções aplicada sobre o valor da venda antes do
+// cálculo da comissão — a comissão incide sobre o valor líquido, não sobre
+// o valor bruto vendido.
+export const COMMISSION_TAX_RATE = 0.16;
+
+export function calcNetSaleValue(saleValue: number): number {
+  return saleValue * (1 - COMMISSION_TAX_RATE);
+}
+
 export function calcCommission(saleValue: number, rate: number, status: PaymentStatus): number {
   if (status === "cancelado" || status === "reembolsado") return 0;
-  return Math.round(saleValue * rate * 100) / 100;
+  const net = calcNetSaleValue(saleValue);
+  return Math.round(net * rate * 100) / 100;
 }
 
 export function statusStyle(s: PaymentStatus) {

@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  PAYMENT_METHODS, PAYMENT_STATUS, PRODUTOS_SUGERIDOS, calcCommission,
+  PAYMENT_METHODS, PAYMENT_STATUS, PRODUTOS_SUGERIDOS, calcCommission, calcNetSaleValue,
+  COMMISSION_TAX_RATE, formatBRL,
   type PaymentMethod, type PaymentStatus, type Sale,
 } from "@/lib/commerce-domain";
 import { useCreateSale, useUpdateSale, useLinks } from "@/lib/commerce-api";
@@ -111,6 +112,7 @@ export function SaleForm({ open, onOpenChange, sale, defaultLeadId, onSaved }: P
 
   const saleValueNum = Number(f.sale_value) || 0;
   const rateNum = (Number(f.commission_rate) || 0) / 100;
+  const netValueNum = calcNetSaleValue(saleValueNum);
   const previewCommission = calcCommission(saleValueNum, rateNum, f.payment_status);
 
   const applyLead = (leadId: string) => {
@@ -260,11 +262,10 @@ export function SaleForm({ open, onOpenChange, sale, defaultLeadId, onSaved }: P
           </Field>
           <div className="col-span-2 rounded-md border bg-muted/50 p-3 text-sm">
             Comissão calculada:{" "}
-            <strong className="text-foreground">
-              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(previewCommission)}
-            </strong>
+            <strong className="text-foreground">{formatBRL(previewCommission)}</strong>
             <span className="ml-2 text-xs text-muted-foreground">
-              ({Number(f.commission_rate || 0)}% sobre {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saleValueNum)})
+              ({Number(f.commission_rate || 0)}% sobre {formatBRL(netValueNum)} líquidos — venda de{" "}
+              {formatBRL(saleValueNum)} bruta, já descontados {COMMISSION_TAX_RATE * 100}% de impostos)
             </span>
           </div>
         </div>
