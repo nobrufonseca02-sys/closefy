@@ -39,6 +39,9 @@ function KanbanPage() {
   const [filters, setFilters] = useState<FiltersState>(defaultFilters);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<EtapaFunil | null>(null);
+  const [bulkTarget, setBulkTarget] = useState<EtapaFunil | "">("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Sale-on-drop pending state
   const [pendingSale, setPendingSale] = useState<{ lead: Lead; fromStage: EtapaFunil } | null>(null);
@@ -142,9 +145,64 @@ function KanbanPage() {
     setFormOpen(true);
   };
 
+  const selectedLeads = selectedStage ? filtered.filter((l) => l.etapa_funil === selectedStage) : [];
+
+  const runBulkMove = async () => {
+    if (!bulkTarget || !selectedStage || selectedLeads.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const lead of selectedLeads) {
+      try {
+        await update.mutateAsync({ id: lead.id, patch: { etapa_funil: bulkTarget } });
+        await recordLeadHistory(lead.id, lead.etapa_funil, bulkTarget, "Migração em massa");
+        ok++;
+      } catch {
+        /* continua com os demais */
+      }
+    }
+    setBulkBusy(false);
+    const label = ETAPAS.find((x) => x.id === bulkTarget)?.label;
+    if (ok === selectedLeads.length) toast.success(`${ok} lead(s) movidos para ${label}`);
+    else toast.error(`${ok} de ${selectedLeads.length} leads movidos para ${label}`);
+    setSelectedStage(null);
+    setBulkTarget("");
+  };
+
   return (
     <AppShell onNewLead={() => openNew()} onImportCsv={() => setImportOpen(true)}>
       <FiltersBar value={filters} onChange={setFilters} allTags={allTags} />
+
+      {selectedStage && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <span className="font-medium">
+            {selectedLeads.length} lead(s) selecionados em “{ETAPAS.find((x) => x.id === selectedStage)?.label}”
+          </span>
+          <select
+            value={bulkTarget}
+            onChange={(e) => setBulkTarget(e.target.value as EtapaFunil)}
+            className="rounded-md border bg-background px-2 py-1 text-sm"
+          >
+            <option value="">Mover para…</option>
+            {ETAPAS.filter((s) => s.id !== selectedStage).map((s) => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => void runBulkMove()}
+            disabled={!bulkTarget || bulkBusy || selectedLeads.length === 0}
+            className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            {bulkBusy ? "Movendo..." : "Migrar coluna"}
+          </button>
+          <button
+            onClick={() => { setSelectedStage(null); setBulkTarget(""); }}
+            className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div
@@ -167,6 +225,11 @@ function KanbanPage() {
                   fase={stage.fase}
                   count={items.length}
                   onAdd={() => openNew(stage.id)}
+                  selected={selectedStage === stage.id}
+                  onToggleSelect={() => {
+                    setBulkTarget("");
+                    setSelectedStage((cur) => (cur === stage.id ? null : stage.id));
+                  }}
                 >
                   {items.map((l) => (
                     <LeadCard
@@ -267,7 +330,7 @@ function KanbanPage() {
 }
 
 function Column({
-  id, label, desc, fase, count, children, onAdd,
+  id, label, desc, fase, count, children, onAdd, selected, onToggleSelect,
 }: {
   id: string;
   label: string;
@@ -276,18 +339,29 @@ function Column({
   count: number;
   children: React.ReactNode;
   onAdd: () => void;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       className={
         "flex w-[280px] shrink-0 flex-col rounded-xl " +
+        (selected ? "ring-2 ring-primary bg-primary/10 " : "") +
         (fase === "pre_venda" ? "bg-primary/5 ring-1 ring-primary/15" : "bg-muted/40")
       }
     >
       <div className="flex items-start justify-between gap-2 px-3 py-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onToggleSelect?.()}
+              disabled={count === 0}
+              className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
+              aria-label={`Selecionar coluna ${label}`}
+            />
             <span className="text-sm font-semibold">{label}</span>
             <span className="rounded-full bg-background px-1.5 py-0.5 text-xs text-muted-foreground">{count}</span>
           </div>
@@ -297,6 +371,7 @@ function Column({
           + novo
         </button>
       </div>
+
       <div
         ref={setNodeRef}
         className={
