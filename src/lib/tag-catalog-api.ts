@@ -21,7 +21,6 @@ export interface LeadHistoryEntry {
 
 export const tagCatalogKey = ["tag_catalog"] as const;
 export const leadHistoryKey = (leadId: string) => ["lead_history", leadId] as const;
-export const recentLeadHistoryKey = (limit: number) => ["lead_history_recent", limit] as const;
 
 export function useTagCatalog() {
   return useQuery({
@@ -80,23 +79,6 @@ export function useLeadHistory(leadId: string | null) {
         .select("*")
         .eq("lead_id", leadId!)
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as LeadHistoryEntry[];
-    },
-  });
-}
-
-// Feed global de mudanças de etapa (sem filtrar por lead) — usado no card
-// "Atividade recente" do dashboard.
-export function useRecentLeadHistory(limit = 15) {
-  return useQuery({
-    queryKey: recentLeadHistoryKey(limit),
-    queryFn: async (): Promise<LeadHistoryEntry[]> => {
-      const { data, error } = await supabase
-        .from("lead_history" as never)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(limit);
       if (error) throw error;
       return (data ?? []) as LeadHistoryEntry[];
     },

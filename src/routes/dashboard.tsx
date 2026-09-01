@@ -2,22 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { LeadForm } from "@/components/LeadForm";
-import { LeadDetail } from "@/components/LeadDetail";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TagBadge } from "@/components/TagBadge";
-import { Button } from "@/components/ui/button";
-import {
-  ArrowRight, Clock, DollarSign, Flame, Handshake, History, Package,
-  Target, TrendingDown, TrendingUp, Trophy, UserPlus, Wallet,
-} from "lucide-react";
+import { DollarSign, Handshake, Package, TrendingDown, TrendingUp, UserPlus } from "lucide-react";
 import { useLeads } from "@/lib/leads-api";
 import { useSales } from "@/lib/commerce-api";
-import { useRecentLeadHistory, type LeadHistoryEntry } from "@/lib/tag-catalog-api";
 import { formatBRL } from "@/lib/commerce-domain";
-import {
-  etapaLabel, formatCurrency, formatDate, relativeTime, tempStyle, type Lead,
-} from "@/lib/domain";
+import { relativeTime } from "@/lib/domain";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -58,38 +49,14 @@ function buildDelta(curr: number, prev: number): Delta {
 function DashboardPage() {
   const { data: leads = [] } = useLeads();
   const { data: sales = [] } = useSales();
-  const { data: history = [] } = useRecentLeadHistory(15);
   const [formOpen, setFormOpen] = useState(false);
-  const [detail, setDetail] = useState<Lead | null>(null);
 
   const stats = useMemo(() => {
     const active = leads.filter((l) => l.etapa_funil !== "venda_ganha" && l.etapa_funil !== "venda_perdida");
     const quentes = active.filter((l) => l.temperatura === "quente");
-    const pagamento = leads.filter((l) => l.etapa_funil === "aguardando_pagamento");
     const ganhas = leads.filter((l) => l.etapa_funil === "venda_ganha");
-    const pipeline = active.reduce((s, l) => s + (l.ticket_estimado ?? 0), 0);
-    const proximasCalls = active
-      .filter((l) => l.data_proxima_reuniao && new Date(l.data_proxima_reuniao).getTime() > Date.now())
-      .sort((a, b) => new Date(a.data_proxima_reuniao!).getTime() - new Date(b.data_proxima_reuniao!).getTime());
-
-    return { active, quentes, pagamento, ganhas, pipeline, proximasCalls };
+    return { active, quentes, ganhas };
   }, [leads]);
-
-  const salesStats = useMemo(() => {
-    const valid = sales.filter((s) => s.payment_status !== "cancelado" && s.payment_status !== "reembolsado");
-    const totalSold = valid.reduce((a, s) => a + Number(s.sale_value), 0);
-    const totalReceived = sales.reduce((a, s) => a + Number(s.amount_paid || (s.payment_status === "pago" ? s.sale_value : 0)), 0);
-    const totalPending = valid
-      .filter((s) => s.payment_status === "aguardando" || s.payment_status === "parcial" || s.payment_status === "inadimplente")
-      .reduce((a, s) => a + Number(s.sale_value) - Number(s.amount_paid || 0), 0);
-    const commissionPredicted = valid.reduce((a, s) => a + Number(s.commission_value), 0);
-    const commissionConfirmed = valid
-      .filter((s) => s.payment_status === "pago")
-      .reduce((a, s) => a + Number(s.commission_value), 0);
-    const paidCount = valid.filter((s) => s.payment_status === "pago").length;
-    const avgTicket = paidCount > 0 ? totalReceived / paidCount : 0;
-    return { totalSold, totalReceived, totalPending, commissionPredicted, commissionConfirmed, paidCount, avgTicket, count: valid.length };
-  }, [sales]);
 
   // KPIs do topo: sempre mês corrente vs mês anterior, com dado real dos dois lados.
   const kpis = useMemo(() => {
@@ -140,11 +107,10 @@ function DashboardPage() {
       .slice(0, 5);
   }, [sales]);
 
-  // Feed de atividade: novos leads + mudanças de etapa + vendas registradas,
-  // cada fonte já vem do banco — só mescla por data e corta no topo N.
+  // Atividade recente: só fatos novos (lead cadastrado, venda registrada) —
+  // sem log de movimentação entre etapas.
   const recentActivity = useMemo(() => {
-    const leadMap = new Map(leads.map((l) => [l.id, l]));
-    type Item = { key: string; at: string; kind: "lead" | "stage" | "sale"; title: string; subtitle: string };
+    type Item = { key: string; at: string; kind: "lead" | "sale"; title: string; subtitle: string };
     const items: Item[] = [];
 
     leads.slice(0, 8).forEach((l) => {
@@ -154,17 +120,6 @@ function DashboardPage() {
         kind: "lead",
         title: "Novo lead cadastrado",
         subtitle: `${l.nome_cliente} · ${l.nome_empresa}`,
-      });
-    });
-
-    history.forEach((h: LeadHistoryEntry) => {
-      const lead = leadMap.get(h.lead_id);
-      items.push({
-        key: `hist-${h.id}`,
-        at: h.created_at,
-        kind: "stage",
-        title: "Mudança de etapa",
-        subtitle: `${lead?.nome_cliente ?? "Lead"}: ${h.from_stage ? etapaLabel(h.from_stage as Lead["etapa_funil"]) : "—"} → ${etapaLabel(h.to_stage as Lead["etapa_funil"])}`,
       });
     });
 
@@ -182,9 +137,7 @@ function DashboardPage() {
       });
 
     return items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 6);
-  }, [leads, sales, history]);
-
-  const detailLive = detail ? leads.find((l) => l.id === detail.id) ?? null : null;
+  }, [leads, sales]);
 
   return (
     <AppShell onNewLead={() => setFormOpen(true)}>
@@ -239,14 +192,10 @@ function DashboardPage() {
                     <div
                       className={
                         "grid size-8 shrink-0 place-items-center rounded-full " +
-                        (item.kind === "lead" ? "bg-green-100 text-green-600"
-                          : item.kind === "sale" ? "bg-blue-100 text-blue-600"
-                          : "bg-purple-100 text-purple-600")
+                        (item.kind === "lead" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600")
                       }
                     >
-                      {item.kind === "lead" && <UserPlus className="size-3.5" />}
-                      {item.kind === "sale" && <DollarSign className="size-3.5" />}
-                      {item.kind === "stage" && <History className="size-3.5" />}
+                      {item.kind === "lead" ? <UserPlus className="size-3.5" /> : <DollarSign className="size-3.5" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{item.title}</div>
@@ -309,43 +258,7 @@ function DashboardPage() {
         </div>
       </div>
 
-      <h2 className="mt-8 mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pipeline</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat icon={<Target className="size-4" />} label="Leads ativos" value={stats.active.length} />
-        <Stat icon={<Flame className="size-4 text-hot" />} label="Leads quentes" value={stats.quentes.length} />
-        <Stat icon={<Wallet className="size-4" />} label="Aguardando pagamento" value={stats.pagamento.length} />
-        <Stat icon={<DollarSign className="size-4" />} label="Pipeline potencial" value={formatCurrency(stats.pipeline)} />
-        <Stat icon={<Trophy className="size-4 text-success" />} label="Vendas ganhas" value={stats.ganhas.length} tone="success" />
-      </div>
-
-      <h2 className="mt-6 mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Financeiro</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat icon={<DollarSign className="size-4" />} label="Total vendido" value={formatBRL(salesStats.totalSold)} />
-        <Stat icon={<Wallet className="size-4 text-success" />} label="Total recebido" value={formatBRL(salesStats.totalReceived)} tone="success" />
-        <Stat icon={<Clock className="size-4 text-warning-foreground" />} label="Aguardando pagamento" value={formatBRL(salesStats.totalPending)} tone="warning" />
-        <Stat icon={<Trophy className="size-4" />} label="Ticket médio" value={formatBRL(salesStats.avgTicket)} />
-        <Stat icon={<DollarSign className="size-4" />} label="Comissão prevista" value={formatBRL(salesStats.commissionPredicted)} />
-        <Stat icon={<DollarSign className="size-4 text-success" />} label="Comissão confirmada" value={formatBRL(salesStats.commissionConfirmed)} tone="success" />
-        <Stat icon={<Trophy className="size-4" />} label="Vendas do período" value={salesStats.count} />
-        <Stat icon={<Wallet className="size-4" />} label="Leads aguardando pgto" value={stats.pagamento.length} />
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PriorityList
-          title="Aguardando pagamento"
-          items={stats.pagamento}
-          onOpen={setDetail}
-        />
-        <PriorityList
-          title="Próximas calls agendadas"
-          items={stats.proximasCalls.slice(0, 8)}
-          onOpen={setDetail}
-          showDate
-        />
-      </div>
-
       <LeadForm open={formOpen} onOpenChange={setFormOpen} />
-      <LeadDetail lead={detailLive} onOpenChange={(o) => !o && setDetail(null)} onEdit={() => {}} />
     </AppShell>
   );
 }
@@ -413,101 +326,5 @@ function QuickStatRow({
         />
       </div>
     </div>
-  );
-}
-
-function Stat({
-  icon, label, value, tone,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number | string;
-  tone?: "danger" | "warning" | "success";
-}) {
-  const toneCls =
-    tone === "danger" ? "border-danger/40 bg-danger/5"
-    : tone === "warning" ? "border-warning/40 bg-warning/5"
-    : tone === "success" ? "border-success/40 bg-success/5"
-    : "";
-  return (
-    <Card className={toneCls}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {icon} {label}
-        </div>
-        <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function PriorityList({
-  title, description, items, onOpen, showDate, empty,
-}: {
-  title: string;
-  description?: string;
-  items: Lead[];
-  onOpen: (l: Lead) => void;
-  showDate?: boolean;
-  empty?: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="mb-2 flex items-baseline justify-between">
-          <div>
-            <h3 className="font-semibold">{title}</h3>
-            {description && <p className="text-xs text-muted-foreground">{description}</p>}
-          </div>
-          <Badge variant="secondary">{items.length}</Badge>
-        </div>
-        {items.length === 0 ? (
-          <div className="rounded-md border border-dashed py-6 text-center text-sm text-muted-foreground">
-            {empty ?? "Nada por aqui"}
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {items.map((l) => {
-              const t = tempStyle(l.temperatura);
-              return (
-                <li key={l.id} className="flex items-center gap-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">{l.nome_cliente}</span>
-                      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] ${t.color}`}>{t.label}</span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                      <span className="truncate">{l.nome_empresa}</span>
-                      <span>·</span>
-                      <span>{etapaLabel(l.etapa_funil)}</span>
-                      <span>·</span>
-                      <span>{formatCurrency(l.ticket_estimado)}</span>
-                      {showDate && l.data_proxima_reuniao && (<>
-                        <span>·</span>
-                        <span>{formatDate(l.data_proxima_reuniao)}</span>
-                      </>)}
-                      {!showDate && (<>
-                        <span>·</span>
-                        <span className="inline-flex items-center gap-0.5"><Clock className="size-3" />{relativeTime(l.ultima_atividade_em)}</span>
-                      </>)}
-                    </div>
-                    {l.tags.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {l.tags.slice(0, 4).map((t) => (
-                          <TagBadge key={t} name={t} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onOpen(l)}>
-                    <ArrowRight className="size-3.5" />
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
   );
 }
