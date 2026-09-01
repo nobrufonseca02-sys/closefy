@@ -11,8 +11,6 @@ export type EtapaFunil =
   | "venda_ganha"
   | "venda_perdida"
   | "base";
-export type SLAStatus = "em_dia" | "atencao" | "vencido" | "na";
-
 // Hipótese de dor usada na abordagem — alinhado às 5 portas de entrada do
 // Plano de Go-to-Market da ByBrain (Bloco 2/3). Obrigatório registrar por lead
 // para que as taxas de conversão por dor sejam mensuráveis (Bloco 5/7).
@@ -101,48 +99,6 @@ export function hoursSince(iso: string | null | undefined): number {
   return (Date.now() - new Date(iso).getTime()) / HOUR;
 }
 
-export function calcSLA(lead: Lead): SLAStatus {
-  const stage = lead.etapa_funil;
-  if (stage === "venda_ganha" || stage === "venda_perdida" || stage === "base") return "na";
-
-  const idle = hoursSince(lead.ultima_atividade_em);
-
-  if (stage === "followup") {
-    if (!lead.data_followup) return idle > 24 ? "vencido" : "em_dia";
-    const diffH = (new Date(lead.data_followup).getTime() - Date.now()) / HOUR;
-    if (diffH < 0) return "vencido";
-    if (diffH < 12) return "atencao";
-    return "em_dia";
-  }
-
-  if (stage === "call_agendada") {
-    if (lead.data_proxima_reuniao) {
-      const diffH = (new Date(lead.data_proxima_reuniao).getTime() - Date.now()) / HOUR;
-      if (diffH < 0) return "vencido";
-      if (diffH < 24) return "atencao";
-    }
-    return idle > 48 ? "atencao" : "em_dia";
-  }
-
-  // prospectando, em_fechamento, aguardando_pagamento → 24h idle
-  if (idle > 24) return "vencido";
-  if (idle > 18) return "atencao";
-  return "em_dia";
-}
-
-export function calcPriority(lead: Lead): number {
-  if (lead.etapa_funil === "venda_ganha" || lead.etapa_funil === "venda_perdida" || lead.etapa_funil === "base") return 0;
-  let score = 0;
-  if (lead.temperatura === "quente") score += 30;
-  if ((lead.ticket_estimado ?? 0) > 30000) score += 20;
-  if (lead.etapa_funil === "em_fechamento") score += 20;
-  if (lead.etapa_funil === "aguardando_pagamento") score += 25;
-  if (lead.data_followup && new Date(lead.data_followup).getTime() < Date.now()) score += 15;
-  if (hoursSince(lead.ultima_atividade_em) > 48) score += 10;
-  if (lead.tags.includes("ICP Forte")) score += 20;
-  return Math.min(score, 100);
-}
-
 export function relativeTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const h = hoursSince(iso);
@@ -162,13 +118,6 @@ export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 }
-
-export const SLA_STYLES: Record<SLAStatus, { label: string; className: string; dot: string }> = {
-  em_dia: { label: "Em dia", className: "bg-success/15 text-success border-success/30", dot: "bg-success" },
-  atencao: { label: "Atenção", className: "bg-warning/20 text-warning-foreground border-warning/40", dot: "bg-warning" },
-  vencido: { label: "SLA vencido", className: "bg-danger/15 text-danger border-danger/30", dot: "bg-danger" },
-  na: { label: "—", className: "bg-muted text-muted-foreground border-border", dot: "bg-muted-foreground" },
-};
 
 export function tempStyle(t: Temperatura) {
   return TEMPERATURAS.find((x) => x.id === t)!;

@@ -22,7 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSales } from "@/lib/commerce-api";
 import { recordLeadHistory } from "@/lib/tag-catalog-api";
-import { ETAPAS, calcSLA, type EtapaFunil, type Lead } from "@/lib/domain";
+import { ETAPAS, type EtapaFunil, type Lead } from "@/lib/domain";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -112,7 +112,6 @@ function KanbanPage() {
     return leads.filter((l) => {
       if (filters.temperatura !== "all" && l.temperatura !== filters.temperatura) return false;
       if (filters.tag && !l.tags.includes(filters.tag)) return false;
-      if (filters.slaVencido && calcSLA(l) !== "vencido") return false;
       if (q) {
         const hay = `${l.nome_cliente} ${l.nome_empresa} ${l.whatsapp} ${l.email ?? ""} ${l.tags.join(" ")}`.toLowerCase();
         if (!hay.includes(q)) return false;

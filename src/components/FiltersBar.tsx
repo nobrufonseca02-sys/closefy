@@ -7,14 +7,12 @@ export interface FiltersState {
   q: string;
   temperatura: Temperatura | "all";
   tag: string;
-  slaVencido: boolean;
 }
 
 export const defaultFilters: FiltersState = {
   q: "",
   temperatura: "all",
   tag: "",
-  slaVencido: false,
 };
 
 interface Props {
@@ -24,8 +22,7 @@ interface Props {
 }
 
 export function FiltersBar({ value, onChange, allTags }: Props) {
-  const active =
-    value.q || value.temperatura !== "all" || value.tag || value.slaVencido;
+  const active = value.q || value.temperatura !== "all" || value.tag;
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -56,14 +53,6 @@ export function FiltersBar({ value, onChange, allTags }: Props) {
         <option value="">Todas as tags</option>
         {allTags.map((t) => (<option key={t} value={t}>{t}</option>))}
       </select>
-
-      <Button
-        variant={value.slaVencido ? "default" : "outline"}
-        size="sm"
-        onClick={() => onChange({ ...value, slaVencido: !value.slaVencido })}
-      >
-        SLA vencido
-      </Button>
 
       {active && (
         <Button size="sm" variant="ghost" onClick={() => onChange(defaultFilters)} className="gap-1">

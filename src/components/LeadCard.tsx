@@ -1,6 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
-import { AlertTriangle, Calendar, Clock, DollarSign } from "lucide-react";
-import { SLA_STYLES, calcSLA, formatCurrency, formatDate, relativeTime, tempStyle, type Lead } from "@/lib/domain";
+import { Calendar, Clock, DollarSign } from "lucide-react";
+import { formatCurrency, formatDate, relativeTime, tempStyle, type Lead } from "@/lib/domain";
 import { TagBadge } from "./TagBadge";
 
 interface Props {
@@ -12,8 +12,6 @@ interface Props {
 }
 
 export function LeadCard({ lead, onOpen, onRegisterSale, selected, onToggleSelected }: Props) {
-  const sla = calcSLA(lead);
-  const slaStyle = SLA_STYLES[sla];
   const temp = tempStyle(lead.temperatura);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id });
@@ -54,12 +52,6 @@ export function LeadCard({ lead, onOpen, onRegisterSale, selected, onToggleSelec
 
       <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{formatCurrency(lead.ticket_estimado)}</span>
-        {sla !== "na" && (
-          <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] ${slaStyle.className}`}>
-            {sla === "vencido" && <AlertTriangle className="size-2.5" />}
-            {slaStyle.label}
-          </span>
-        )}
       </div>
 
       {lead.tags.length > 0 && (

@@ -10,7 +10,7 @@ import { Copy, DollarSign, ExternalLink, History, Pencil, Plus, Trash2 } from "l
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  ETAPAS, HIPOTESES_DOR, SLA_STYLES, TEMPERATURAS, calcSLA, etapaLabel, formatCurrency,
+  ETAPAS, HIPOTESES_DOR, TEMPERATURAS, etapaLabel, formatCurrency,
   formatDate, relativeTime, tempStyle,
   type EtapaFunil, type Lead, type Temperatura,
 } from "@/lib/domain";
@@ -41,7 +41,6 @@ export function LeadDetail({ lead, onOpenChange, onEdit }: Props) {
   const [saleOpen, setSaleOpen] = useState(false);
 
   if (!lead) return null;
-  const sla = calcSLA(lead);
   const temp = tempStyle(lead.temperatura);
 
   const quickPatch = (patch: Partial<Lead>) =>
@@ -85,11 +84,6 @@ export function LeadDetail({ lead, onOpenChange, onEdit }: Props) {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${temp.color}`}>{temp.label}</span>
             <Badge variant="secondary">{etapaLabel(lead.etapa_funil)}</Badge>
-            {sla !== "na" && (
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${SLA_STYLES[sla].className}`}>
-                {SLA_STYLES[sla].label}
-              </span>
-            )}
           </div>
         </SheetHeader>
 

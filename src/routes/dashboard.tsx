@@ -7,13 +7,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TagBadge } from "@/components/TagBadge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRight, Clock, DollarSign, Flame, Handshake, Snowflake, Target, Trophy, Wallet } from "lucide-react";
+import { ArrowRight, Clock, DollarSign, Flame, Target, Trophy, Wallet } from "lucide-react";
 import { useLeads } from "@/lib/leads-api";
 import { useSales } from "@/lib/commerce-api";
 import { formatBRL } from "@/lib/commerce-domain";
 import {
-  SLA_STYLES, calcPriority, calcSLA, etapaLabel, formatCurrency,
-  formatDate, hoursSince, relativeTime, tempStyle, type Lead,
+  etapaLabel, formatCurrency, formatDate, relativeTime, tempStyle, type Lead,
 } from "@/lib/domain";
 
 export const Route = createFileRoute("/dashboard")({
@@ -32,17 +31,14 @@ function DashboardPage() {
   const stats = useMemo(() => {
     const active = leads.filter((l) => l.etapa_funil !== "venda_ganha" && l.etapa_funil !== "venda_perdida");
     const quentes = active.filter((l) => l.temperatura === "quente");
-    const fechamento = leads.filter((l) => l.etapa_funil === "em_fechamento");
     const pagamento = leads.filter((l) => l.etapa_funil === "aguardando_pagamento");
     const ganhas = leads.filter((l) => l.etapa_funil === "venda_ganha");
-    const fuVencidos = active.filter((l) => l.data_followup && new Date(l.data_followup).getTime() < Date.now());
-    const semAtendimento = active.filter((l) => hoursSince(l.ultima_atividade_em) > 48);
     const pipeline = active.reduce((s, l) => s + (l.ticket_estimado ?? 0), 0);
     const proximasCalls = active
       .filter((l) => l.data_proxima_reuniao && new Date(l.data_proxima_reuniao).getTime() > Date.now())
       .sort((a, b) => new Date(a.data_proxima_reuniao!).getTime() - new Date(b.data_proxima_reuniao!).getTime());
 
-    return { active, quentes, fechamento, pagamento, ganhas, fuVencidos, semAtendimento, pipeline, proximasCalls };
+    return { active, quentes, pagamento, ganhas, pipeline, proximasCalls };
   }, [leads]);
 
   const salesStats = useMemo(() => {
@@ -70,10 +66,7 @@ function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat icon={<Target className="size-4" />} label="Leads ativos" value={stats.active.length} />
         <Stat icon={<Flame className="size-4 text-hot" />} label="Leads quentes" value={stats.quentes.length} />
-        <Stat icon={<Handshake className="size-4" />} label="Em fechamento" value={stats.fechamento.length} />
         <Stat icon={<Wallet className="size-4" />} label="Aguardando pagamento" value={stats.pagamento.length} />
-        <Stat icon={<AlertTriangle className="size-4 text-danger" />} label="Follow-ups vencidos" value={stats.fuVencidos.length} tone="danger" />
-        <Stat icon={<Snowflake className="size-4" />} label="Sem atendimento >48h" value={stats.semAtendimento.length} tone="warning" />
         <Stat icon={<DollarSign className="size-4" />} label="Pipeline potencial" value={formatCurrency(stats.pipeline)} />
         <Stat icon={<Trophy className="size-4 text-success" />} label="Vendas ganhas" value={stats.ganhas.length} tone="success" />
       </div>
@@ -91,34 +84,6 @@ function DashboardPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PriorityList
-          title="Prioridade máxima"
-          description="Ordenado pelo score comercial"
-          items={[...stats.active].sort((a, b) => calcPriority(b) - calcPriority(a)).slice(0, 8)}
-          onOpen={setDetail}
-          showScore
-        />
-        <PriorityList
-          title="Leads mais quentes"
-          items={stats.quentes.slice(0, 8)}
-          onOpen={setDetail}
-        />
-        <PriorityList
-          title="Follow-ups vencidos"
-          items={stats.fuVencidos.slice(0, 8)}
-          onOpen={setDetail}
-          empty="Nenhum follow-up vencido 🎉"
-        />
-        <PriorityList
-          title="Sem atendimento há muito tempo"
-          items={stats.semAtendimento.slice(0, 8)}
-          onOpen={setDetail}
-        />
-        <PriorityList
-          title="Em fechamento"
-          items={stats.fechamento}
-          onOpen={setDetail}
-        />
         <PriorityList
           title="Aguardando pagamento"
           items={stats.pagamento}
@@ -164,13 +129,12 @@ function Stat({
 }
 
 function PriorityList({
-  title, description, items, onOpen, showScore, showDate, empty,
+  title, description, items, onOpen, showDate, empty,
 }: {
   title: string;
   description?: string;
   items: Lead[];
   onOpen: (l: Lead) => void;
-  showScore?: boolean;
   showDate?: boolean;
   empty?: string;
 }) {
@@ -192,7 +156,6 @@ function PriorityList({
           <ul className="divide-y">
             {items.map((l) => {
               const t = tempStyle(l.temperatura);
-              const sla = calcSLA(l);
               return (
                 <li key={l.id} className="flex items-center gap-3 py-2">
                   <div className="min-w-0 flex-1">
@@ -223,21 +186,9 @@ function PriorityList({
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    {showScore && (
-                      <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
-                        {calcPriority(l)}
-                      </span>
-                    )}
-                    {sla !== "na" && (
-                      <span className={`rounded-full border px-1.5 py-0.5 text-[10px] ${SLA_STYLES[sla].className}`}>
-                        {SLA_STYLES[sla].label}
-                      </span>
-                    )}
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onOpen(l)}>
-                      <ArrowRight className="size-3.5" />
-                    </Button>
-                  </div>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onOpen(l)}>
+                    <ArrowRight className="size-3.5" />
+                  </Button>
                 </li>
               );
             })}
