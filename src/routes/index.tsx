@@ -256,11 +256,13 @@ function KanbanPage() {
                   fase={stage.fase}
                   count={items.length}
                   onAdd={() => openNew(stage.id)}
-                  selected={selectedStage === stage.id}
-                  onToggleSelect={() => {
-                    setBulkTarget("");
-                    setSelectedStage((cur) => (cur === stage.id ? null : stage.id));
-                  }}
+                  selected={items.length > 0 && items.every((l) => selectedIds.has(l.id))}
+                  onToggleSelect={() =>
+                    toggleColumn(
+                      items.map((l) => l.id),
+                      items.length > 0 && items.every((l) => selectedIds.has(l.id)),
+                    )
+                  }
                 >
                   {items.map((l) => (
                     <LeadCard
@@ -268,6 +270,8 @@ function KanbanPage() {
                       lead={l}
                       onOpen={setDetail}
                       onRegisterSale={(lead) => setSaleForLead(lead)}
+                      selected={selectedIds.has(l.id)}
+                      onToggleSelected={(lead) => toggleLead(lead.id)}
                     />
                   ))}
                   {items.length === 0 && (
