@@ -1,5 +1,5 @@
 import { useDraggable } from "@dnd-kit/core";
-import { Calendar, Clock, DollarSign } from "lucide-react";
+import { Calendar, CalendarClock, Clock, DollarSign } from "lucide-react";
 import { formatCurrency, formatDate, relativeTime, tempStyle, type Lead } from "@/lib/domain";
 import { TagBadge } from "./TagBadge";
 
@@ -49,6 +49,12 @@ export function LeadCard({ lead, onOpen, onRegisterSale, selected, onToggleSelec
           {temp.label}
         </span>
       </div>
+
+      {lead.data_proxima_reuniao && (
+        <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+          <CalendarClock className="size-3" /> {formatDate(lead.data_proxima_reuniao)}
+        </div>
+      )}
 
       <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{formatCurrency(lead.ticket_estimado)}</span>
