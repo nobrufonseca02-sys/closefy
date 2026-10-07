@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  ArrowLeft,
   Check,
   CheckCheck,
   Clock3,
@@ -74,7 +75,14 @@ function ConversationsPage() {
   }, [conversations, search]);
 
   useEffect(() => {
-    if (!selectedId && conversations[0]) setSelectedId(conversations[0].id);
+    if (
+      !selectedId &&
+      conversations[0] &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 1024px)").matches
+    ) {
+      setSelectedId(conversations[0].id);
+    }
   }, [conversations, selectedId]);
 
   useEffect(() => {
@@ -116,11 +124,14 @@ function ConversationsPage() {
         onClick: () => setNewConversationOpen(true),
       }}
     >
-      <div className="flex h-[calc(100vh-5.5rem)] min-h-[620px] overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className="flex h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-0 overflow-hidden rounded-xl border bg-card shadow-sm md:h-[calc(100dvh-5.5rem)] md:min-h-[620px]">
         <aside
-          className={cn("w-full shrink-0 border-r lg:w-[360px]", selected && "hidden lg:block")}
+          className={cn(
+            "flex h-full w-full shrink-0 flex-col lg:w-[360px] lg:border-r",
+            selected && "hidden lg:flex",
+          )}
         >
-          <div className="border-b p-4">
+          <div className="shrink-0 border-b p-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h1 className="font-semibold tracking-tight">Conversas</h1>
@@ -138,7 +149,7 @@ function ConversationsPage() {
               />
             </div>
           </div>
-          <div className="h-[calc(100%-105px)] overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {isLoading ? (
               <div className="grid h-40 place-items-center text-muted-foreground">
                 <Loader2 className="size-5 animate-spin" />
@@ -164,7 +175,7 @@ function ConversationsPage() {
           </div>
         </aside>
 
-        <section className={cn("min-w-0 flex-1", !selected && "hidden lg:block")}>
+        <section className={cn("h-full min-w-0 flex-1", !selected && "hidden lg:block")}>
           {selected ? (
             <ConversationThread
               conversation={selected}
@@ -295,11 +306,17 @@ function ConversationThread({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex h-[72px] items-center gap-3 border-b px-4">
-        <Button variant="ghost" size="sm" className="lg:hidden" onClick={onBack}>
-          Voltar
+      <header className="flex h-16 shrink-0 items-center gap-2 border-b px-2 sm:h-[72px] sm:gap-3 sm:px-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 lg:hidden"
+          onClick={onBack}
+          aria-label="Voltar para conversas"
+        >
+          <ArrowLeft className="size-5" />
         </Button>
-        <div className="grid size-10 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+        <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary sm:size-10">
           {conversationName(conversation).slice(0, 2).toUpperCase()}
         </div>
         <div className="min-w-0">
@@ -309,13 +326,16 @@ function ConversationThread({
           </div>
         </div>
         {conversation.lead_id && (
-          <Link to="/" className="ml-auto text-xs font-medium text-primary hover:underline">
-            Ver no Kanban
+          <Link
+            to="/"
+            className="ml-auto shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+          >
+            <span className="hidden sm:inline">Ver no </span>Kanban
           </Link>
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto bg-muted/20 px-4 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20 px-3 py-4 sm:px-4 sm:py-5">
         {isLoading ? (
           <div className="grid h-full place-items-center text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
@@ -351,7 +371,7 @@ function ConversationThread({
           <AlertCircle className="size-3.5" /> Vincule o WhatsApp para receber e enviar mensagens.
         </div>
       )}
-      <div className="border-t bg-card p-3">
+      <div className="shrink-0 border-t bg-card p-2.5 sm:p-3">
         <div className="mx-auto flex max-w-3xl items-end gap-2">
           <Textarea
             value={draft}
@@ -366,7 +386,7 @@ function ConversationThread({
             rows={1}
             maxLength={4000}
             placeholder={connected ? "Digite uma mensagem..." : "WhatsApp desconectado"}
-            className="max-h-32 min-h-10 resize-none"
+            className="max-h-32 min-h-10 resize-none text-base sm:text-sm"
           />
           <Button
             size="icon"
@@ -392,7 +412,7 @@ function MessageBubble({ message, onRetry }: { message: WhatsAppMessage; onRetry
     <div className={cn("flex", outbound ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[82%] rounded-2xl px-3 py-2 text-sm shadow-sm",
+          "max-w-[88%] rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[82%]",
           outbound
             ? "rounded-br-md bg-primary text-primary-foreground"
             : "rounded-bl-md border bg-card text-card-foreground",
@@ -471,7 +491,7 @@ function NewConversationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-1.5rem)] w-[calc(100%-1.5rem)] overflow-y-auto rounded-xl p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Nova conversa</DialogTitle>
         </DialogHeader>
@@ -507,14 +527,14 @@ function NewConversationDialog({
             </p>
           )}
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button className="w-full sm:w-auto" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button
             disabled={!connected || startConversation.isPending}
             onClick={() => void submit()}
-            className="gap-2"
+            className="w-full gap-2 sm:w-auto"
           >
             {startConversation.isPending ? (
               <Loader2 className="size-4 animate-spin" />

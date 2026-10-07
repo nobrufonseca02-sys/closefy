@@ -79,15 +79,15 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b bg-card/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-4">
+      <header className="sticky top-0 z-30 border-b bg-card/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-3 px-3 sm:px-4">
           <div className="flex items-center gap-2">
             <div className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
               C
             </div>
             <span className="font-semibold tracking-tight">Closefy</span>
           </div>
-          <nav className="ml-4 flex items-center gap-1">
+          <nav className="ml-4 hidden items-center gap-1 md:flex">
             <Link to="/">
               <Button
                 variant={pathname === "/" ? "secondary" : "ghost"}
@@ -139,7 +139,7 @@ export function AppShell({
               <Button
                 variant="ghost"
                 size="sm"
-                className="gap-2"
+                className="hidden gap-2 md:inline-flex"
                 onClick={onImportCsv ?? (() => toast.info("Importação CSV em breve"))}
               >
                 <Upload className="size-4" /> Importar CSV
@@ -149,31 +149,92 @@ export function AppShell({
               <Button
                 variant={selectMode ? "secondary" : "ghost"}
                 size="sm"
-                className="gap-2"
+                className="hidden gap-2 md:inline-flex"
                 onClick={onToggleSelect}
               >
                 <ListChecks className="size-4" /> {selectMode ? "Cancelar seleção" : "Selecionar"}
               </Button>
             )}
             {action && (
-              <Button size="sm" className="gap-2" onClick={action.onClick}>
-                <Plus className="size-4" /> {action.label}
+              <Button
+                size="sm"
+                className="size-9 gap-2 px-0 sm:h-9 sm:w-auto sm:px-3"
+                onClick={action.onClick}
+                aria-label={action.label}
+              >
+                <Plus className="size-4" /> <span className="hidden sm:inline">{action.label}</span>
               </Button>
             )}
             <Button
               variant="ghost"
               size="sm"
-              className="gap-2 text-muted-foreground"
+              className="size-9 gap-2 px-0 text-muted-foreground sm:h-9 sm:w-auto sm:px-3"
               onClick={async () => {
                 await supabase.auth.signOut();
               }}
             >
-              <LogOut className="size-4" /> Sair
+              <LogOut className="size-4" /> <span className="hidden sm:inline">Sair</span>
             </Button>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-[1600px] px-4 py-4">{children}</main>
+      <main className="mx-auto max-w-[1600px] px-3 py-3 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-4 md:py-4 md:pb-4">
+        {children}
+      </main>
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        <div className="mx-auto grid h-16 max-w-lg grid-cols-5 px-1">
+          <MobileNavItem to="/" active={pathname === "/"} label="Kanban" icon={<Kanban />} />
+          <MobileNavItem
+            to="/dashboard"
+            active={pathname === "/dashboard"}
+            label="Dashboard"
+            icon={<LayoutDashboard />}
+          />
+          <MobileNavItem
+            to="/links"
+            active={pathname === "/links"}
+            label="Links"
+            icon={<Link2 />}
+          />
+          <MobileNavItem
+            to="/vendas"
+            active={pathname === "/vendas"}
+            label="Vendas"
+            icon={<DollarSign />}
+          />
+          <MobileNavItem
+            to="/conversas"
+            active={pathname === "/conversas"}
+            label="Conversas"
+            icon={<MessageCircle />}
+          />
+        </div>
+      </nav>
     </div>
+  );
+}
+
+function MobileNavItem({
+  to,
+  active,
+  label,
+  icon,
+}: {
+  to: "/" | "/dashboard" | "/links" | "/vendas" | "/conversas";
+  active: boolean;
+  label: string;
+  icon: ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      aria-label={label}
+      className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium transition-colors ${
+        active ? "text-primary" : "text-muted-foreground"
+      }`}
+    >
+      <span className="[&>svg]:size-5">{icon}</span>
+      <span className="max-w-full truncate">{label}</span>
+    </Link>
   );
 }
