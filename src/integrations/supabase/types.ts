@@ -179,6 +179,12 @@ export type Database = {
           ultima_atividade_em: string
           updated_at: string
           whatsapp: string
+          whatsapp_business_phone: string | null
+          whatsapp_jid: string | null
+          whatsapp_last_message_at: string | null
+          whatsapp_last_message_from_me: boolean | null
+          whatsapp_sync_source: string | null
+          whatsapp_synced_at: string | null
         }
         Insert: {
           cargo?: string | null
@@ -203,6 +209,12 @@ export type Database = {
           ultima_atividade_em?: string
           updated_at?: string
           whatsapp: string
+          whatsapp_business_phone?: string | null
+          whatsapp_jid?: string | null
+          whatsapp_last_message_at?: string | null
+          whatsapp_last_message_from_me?: boolean | null
+          whatsapp_sync_source?: string | null
+          whatsapp_synced_at?: string | null
         }
         Update: {
           cargo?: string | null
@@ -227,6 +239,12 @@ export type Database = {
           ultima_atividade_em?: string
           updated_at?: string
           whatsapp?: string
+          whatsapp_business_phone?: string | null
+          whatsapp_jid?: string | null
+          whatsapp_last_message_at?: string | null
+          whatsapp_last_message_from_me?: boolean | null
+          whatsapp_sync_source?: string | null
+          whatsapp_synced_at?: string | null
         }
         Relationships: []
       }

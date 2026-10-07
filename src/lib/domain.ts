@@ -39,6 +39,12 @@ export interface Lead {
   origem: string | null;
   hipotese_dor: string | null;
   motivo_perda: string | null;
+  whatsapp_jid: string | null;
+  whatsapp_business_phone: string | null;
+  whatsapp_last_message_at: string | null;
+  whatsapp_last_message_from_me: boolean | null;
+  whatsapp_sync_source: string | null;
+  whatsapp_synced_at: string | null;
   link_reuniao: string | null;
   data_proxima_reuniao: string | null;
   data_followup: string | null;

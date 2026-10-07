@@ -1,0 +1,25 @@
+{
+  "name": "closefy-whatsapp-sync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "pair": "cross-env WHATSAPP_PAIRING_MODE=true tsx src/index.ts",
+    "test": "tsx --test src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.2",
+    "@whiskeysockets/baileys": "6.7.24",
+    "dotenv": "^16.4.7",
+    "pino": "^9.6.0",
+    "tsx": "^4.19.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.8.3"
+  }
+}
