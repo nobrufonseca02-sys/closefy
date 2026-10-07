@@ -1,5 +1,15 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Kanban, LayoutDashboard, LogOut, Plus, Upload, Link2, DollarSign, ListChecks } from "lucide-react";
+import {
+  Kanban,
+  LayoutDashboard,
+  LogOut,
+  Plus,
+  Upload,
+  Link2,
+  DollarSign,
+  ListChecks,
+  MessageCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useEffect, useState, type ReactNode } from "react";
@@ -46,14 +56,25 @@ function useRequireAuth() {
   return ready;
 }
 
-export function AppShell({ children, onNewLead, primaryAction, onImportCsv, selectMode, onToggleSelect }: Props) {
+export function AppShell({
+  children,
+  onNewLead,
+  primaryAction,
+  onImportCsv,
+  selectMode,
+  onToggleSelect,
+}: Props) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const ready = useRequireAuth();
 
   const action = primaryAction ?? (onNewLead ? { label: "Novo Lead", onClick: onNewLead } : null);
 
   if (!ready) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Carregando...</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        Carregando...
+      </div>
+    );
   }
 
   return (
@@ -61,28 +82,55 @@ export function AppShell({ children, onNewLead, primaryAction, onImportCsv, sele
       <header className="sticky top-0 z-30 border-b bg-card/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-4">
           <div className="flex items-center gap-2">
-            <div className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-sm">C</div>
+            <div className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
+              C
+            </div>
             <span className="font-semibold tracking-tight">Closefy</span>
           </div>
           <nav className="ml-4 flex items-center gap-1">
             <Link to="/">
-              <Button variant={pathname === "/" ? "secondary" : "ghost"} size="sm" className="gap-2">
+              <Button
+                variant={pathname === "/" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-2"
+              >
                 <Kanban className="size-4" /> Kanban
               </Button>
             </Link>
             <Link to="/dashboard">
-              <Button variant={pathname === "/dashboard" ? "secondary" : "ghost"} size="sm" className="gap-2">
+              <Button
+                variant={pathname === "/dashboard" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-2"
+              >
                 <LayoutDashboard className="size-4" /> Dashboard
               </Button>
             </Link>
             <Link to="/links">
-              <Button variant={pathname === "/links" ? "secondary" : "ghost"} size="sm" className="gap-2">
+              <Button
+                variant={pathname === "/links" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-2"
+              >
                 <Link2 className="size-4" /> Links
               </Button>
             </Link>
             <Link to="/vendas">
-              <Button variant={pathname === "/vendas" ? "secondary" : "ghost"} size="sm" className="gap-2">
+              <Button
+                variant={pathname === "/vendas" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-2"
+              >
                 <DollarSign className="size-4" /> Vendas
+              </Button>
+            </Link>
+            <Link to="/conversas">
+              <Button
+                variant={pathname === "/conversas" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-2"
+              >
+                <MessageCircle className="size-4" /> Conversas
               </Button>
             </Link>
           </nav>

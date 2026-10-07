@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Contact } from "@whiskeysockets/baileys";
-import { addContacts, isOneToOneJid, resolvePeer, type ContactDirectory } from "./whatsapp.js";
+import {
+  addContacts,
+  extractMessage,
+  isOneToOneJid,
+  resolvePeer,
+  type ContactDirectory,
+} from "./whatsapp.js";
 
 test("accepts only direct user and LID conversations", () => {
   assert.equal(isOneToOneJid("5521999999999@s.whatsapp.net"), true);
@@ -40,4 +46,15 @@ test("resolves an anonymous LID through the synced contact directory", () => {
 
 test("does not mistake an unresolved LID for a phone number", () => {
   assert.equal(resolvePeer("987654321@lid", new Map()), null);
+});
+
+test("extracts text and media placeholders without downloading media", () => {
+  assert.deepEqual(extractMessage({ message: { conversation: "  Olá  " }, key: {} } as never), {
+    type: "text",
+    content: "Olá",
+  });
+  assert.deepEqual(extractMessage({ message: { audioMessage: {} }, key: {} } as never), {
+    type: "audio",
+    content: "🎵 Áudio",
+  });
 });

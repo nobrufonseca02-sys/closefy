@@ -52,3 +52,77 @@ export function messageTimestamp(message: WAMessage): Date {
   else if (value && typeof value === "object" && "toNumber" in value) seconds = value.toNumber();
   return seconds > 0 ? new Date(seconds * 1000) : new Date();
 }
+
+export type ExtractedMessage = {
+  type:
+    | "text"
+    | "image"
+    | "video"
+    | "audio"
+    | "document"
+    | "sticker"
+    | "location"
+    | "contact"
+    | "reaction"
+    | "unknown";
+  content: string;
+};
+
+function unwrapMessage(message: WAMessage["message"]) {
+  return (
+    message?.ephemeralMessage?.message ||
+    message?.viewOnceMessage?.message ||
+    message?.viewOnceMessageV2?.message ||
+    message?.documentWithCaptionMessage?.message ||
+    message
+  );
+}
+
+export function extractMessage(message: WAMessage): ExtractedMessage | null {
+  const content = unwrapMessage(message.message);
+  if (!content) return null;
+
+  const text = content.conversation || content.extendedTextMessage?.text;
+  if (text?.trim()) return { type: "text", content: text.trim() };
+
+  if (content.imageMessage) {
+    return { type: "image", content: content.imageMessage.caption?.trim() || "📷 Imagem" };
+  }
+  if (content.videoMessage) {
+    return { type: "video", content: content.videoMessage.caption?.trim() || "🎥 Vídeo" };
+  }
+  if (content.audioMessage) return { type: "audio", content: "🎵 Áudio" };
+  if (content.documentMessage) {
+    return {
+      type: "document",
+      content:
+        content.documentMessage.caption?.trim() ||
+        content.documentMessage.fileName?.trim() ||
+        "📄 Documento",
+    };
+  }
+  if (content.stickerMessage) return { type: "sticker", content: "Sticker" };
+  if (content.locationMessage) {
+    const latitude = content.locationMessage.degreesLatitude;
+    const longitude = content.locationMessage.degreesLongitude;
+    return {
+      type: "location",
+      content:
+        typeof latitude === "number" && typeof longitude === "number"
+          ? `📍 Localização: ${latitude}, ${longitude}`
+          : "📍 Localização",
+    };
+  }
+  if (content.contactMessage) {
+    return {
+      type: "contact",
+      content: `Contato: ${content.contactMessage.displayName?.trim() || "sem nome"}`,
+    };
+  }
+  if (content.reactionMessage?.text) {
+    return { type: "reaction", content: `Reação: ${content.reactionMessage.text}` };
+  }
+
+  if (content.protocolMessage || content.senderKeyDistributionMessage) return null;
+  return { type: "unknown", content: "Mensagem não suportada" };
+}

@@ -11,18 +11,27 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import { config } from "./config.js";
 import { startHealthServer, type SyncStatus } from "./health.js";
-import { syncLead } from "./leadSync.js";
 import { log } from "./logger.js";
 import {
   addContacts,
+  extractMessage,
   isOneToOneJid,
   messageTimestamp,
   resolvePeer,
   type ContactDirectory,
 } from "./whatsapp.js";
+import {
+  claimOutboundMessages,
+  completeOutboundMessage,
+  failOutboundMessage,
+  heartbeat,
+  syncConversation,
+  syncMessage as persistMessage,
+  updateMessageDelivery,
+} from "./whatsappStore.js";
 
 const contacts: ContactDirectory = new Map();
-const pendingMessages = new Map<string, WAMessage>();
+const pendingMessages = new Map<string, { message: WAMessage; isHistory: boolean }>();
 const pendingChats = new Map<string, Chat>();
 const status: SyncStatus = {
   connected: false,
@@ -32,8 +41,11 @@ const status: SyncStatus = {
   pending: 0,
   failed: 0,
 };
+
 let stoppedForWrongNumber = false;
 let retryingPending = false;
+let currentSocket: WASocket | null = null;
+let outboundPollRunning = false;
 
 function refreshPendingCount(): void {
   status.pending = pendingMessages.size + pendingChats.size;
@@ -45,15 +57,15 @@ function ownPhoneFromSocket(sock: WASocket): string | null {
   return digits.length >= 10 && digits.length <= 15 ? digits : null;
 }
 
-async function syncMessage(message: WAMessage): Promise<void> {
+async function processMessage(message: WAMessage, isHistory = false): Promise<void> {
   const peer = resolvePeer(message.key.remoteJid, contacts);
   if (!peer) {
     const jid = message.key.remoteJid ? jidNormalizedUser(message.key.remoteJid) : null;
     if (jid?.endsWith("@lid")) {
-      pendingMessages.set(
-        message.key.id || `${jid}:${messageTimestamp(message).getTime()}`,
+      pendingMessages.set(message.key.id || `${jid}:${messageTimestamp(message).getTime()}`, {
         message,
-      );
+        isHistory,
+      });
       refreshPendingCount();
     } else {
       status.skipped += 1;
@@ -65,25 +77,35 @@ async function syncMessage(message: WAMessage): Promise<void> {
     return;
   }
 
+  const extracted = extractMessage(message);
+  if (!extracted) {
+    status.skipped += 1;
+    return;
+  }
+
   try {
-    await syncLead({
+    await persistMessage({
       ...peer,
       displayName:
         peer.displayName || (!message.key.fromMe ? message.pushName?.trim() || null : null),
-      messageAt: messageTimestamp(message),
+      activityAt: messageTimestamp(message),
       fromMe: Boolean(message.key.fromMe),
+      waMessageId: message.key.id || `${peer.remoteJid}:${messageTimestamp(message).getTime()}`,
+      content: extracted.content,
+      messageType: extracted.type,
+      isHistory,
     });
     status.synced += 1;
   } catch (error) {
     status.failed += 1;
     log.error({
-      event: "lead_sync_failed",
+      event: "message_sync_failed",
       error: error instanceof Error ? error.message : String(error),
     });
   }
 }
 
-async function syncChat(chat: Chat): Promise<void> {
+async function processChat(chat: Chat): Promise<void> {
   const peer = resolvePeer(chat.id, contacts);
   if (!peer) {
     if (isOneToOneJid(chat.id) && jidNormalizedUser(chat.id).endsWith("@lid")) {
@@ -100,9 +122,9 @@ async function syncChat(chat: Chat): Promise<void> {
   }
 
   const rawTimestamp = Number(chat.conversationTimestamp || chat.lastMessageRecvTimestamp || 0);
-  const messageAt = rawTimestamp > 0 ? new Date(rawTimestamp * 1000) : new Date();
+  const activityAt = rawTimestamp > 0 ? new Date(rawTimestamp * 1000) : new Date();
   try {
-    await syncLead({ ...peer, messageAt, fromMe: true });
+    await syncConversation({ ...peer, activityAt, fromMe: true });
     status.synced += 1;
   } catch (error) {
     status.failed += 1;
@@ -137,8 +159,10 @@ async function retryPending(): Promise<void> {
     pendingMessages.clear();
     pendingChats.clear();
     refreshPendingCount();
-    await syncWithConcurrency(messages, syncMessage);
-    await syncWithConcurrency(chats, syncChat);
+    await syncWithConcurrency(messages, ({ message, isHistory }) =>
+      processMessage(message, isHistory),
+    );
+    await syncWithConcurrency(chats, processChat);
   } finally {
     retryingPending = false;
   }
@@ -152,6 +176,7 @@ async function start(): Promise<void> {
     syncFullHistory: true,
     shouldSyncHistoryMessage: () => true,
     markOnlineOnConnect: false,
+    emitOwnEvents: false,
     logger: log.child({ component: "baileys" }),
   });
 
@@ -189,15 +214,23 @@ async function start(): Promise<void> {
       }
 
       status.connected = true;
+      currentSocket = sock;
       log.info({ event: "whatsapp_connected" });
+      void heartbeat(true, status.historyComplete).catch((error) =>
+        log.error({ event: "heartbeat_failed", error: error.message }),
+      );
     }
 
     if (connection === "close") {
       status.connected = false;
+      if (currentSocket === sock) currentSocket = null;
       const statusCode = (lastDisconnect?.error as { output?: { statusCode?: number } } | undefined)
         ?.output?.statusCode;
       const shouldReconnect = !stoppedForWrongNumber && statusCode !== DisconnectReason.loggedOut;
       log.warn({ event: "whatsapp_disconnected", statusCode, shouldReconnect });
+      void heartbeat(false, status.historyComplete).catch((error) =>
+        log.error({ event: "heartbeat_failed", error: error.message }),
+      );
       if (shouldReconnect) {
         void start().catch((error) =>
           log.error({ event: "reconnect_failed", error: error.message }),
@@ -225,24 +258,28 @@ async function start(): Promise<void> {
     async ({ contacts: historyContacts, chats, messages, isLatest, progress }) => {
       addContacts(contacts, historyContacts);
 
-      // Messages contain direction information, so they take precedence. Chats with no
-      // message in this history batch are still imported to cover every existing thread.
-      const latestByChat = new Map<string, WAMessage>();
-      for (const message of messages) {
-        const jid = message.key.remoteJid ? jidNormalizedUser(message.key.remoteJid) : null;
-        if (!jid) continue;
-        const current = latestByChat.get(jid);
-        if (!current || messageTimestamp(message) > messageTimestamp(current))
-          latestByChat.set(jid, message);
-      }
-
-      await syncWithConcurrency([...latestByChat.values()], syncMessage);
-      const chatsWithoutMessages = chats.filter(
-        (chat) => !latestByChat.has(jidNormalizedUser(chat.id)),
+      const sortedMessages = [...messages].sort(
+        (a, b) => messageTimestamp(a).getTime() - messageTimestamp(b).getTime(),
       );
-      await syncWithConcurrency(chatsWithoutMessages, syncChat);
+      await syncWithConcurrency(sortedMessages, (message) => processMessage(message, true));
+
+      const chatsWithMessages = new Set(
+        messages
+          .map((message) => message.key.remoteJid)
+          .filter((jid): jid is string => Boolean(jid))
+          .map(jidNormalizedUser),
+      );
+      const chatsWithoutMessages = chats.filter(
+        (chat) => !chatsWithMessages.has(jidNormalizedUser(chat.id)),
+      );
+      await syncWithConcurrency(chatsWithoutMessages, processChat);
 
       if (isLatest || progress === 100) status.historyComplete = true;
+      if (status.historyComplete) {
+        void heartbeat(status.connected, true).catch((error) =>
+          log.error({ event: "heartbeat_failed", error: error.message }),
+        );
+      }
       log.info({
         event: "history_batch_synced",
         chats: chats.length,
@@ -258,11 +295,61 @@ async function start(): Promise<void> {
   );
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
-    await syncWithConcurrency(messages, syncMessage);
+    await syncWithConcurrency(messages, (message) => processMessage(message, false));
+  });
+
+  sock.ev.on("message-receipt.update", async (updates) => {
+    await syncWithConcurrency(updates, async ({ key, receipt }) => {
+      if (!key.id || !key.fromMe) return;
+      const deliveryStatus = receipt.readTimestamp
+        ? "read"
+        : receipt.receiptTimestamp || receipt.deliveredDeviceJid?.length
+          ? "delivered"
+          : null;
+      if (deliveryStatus) await updateMessageDelivery(key.id, deliveryStatus);
+    });
   });
 }
 
+async function pollOutboundMessages(): Promise<void> {
+  if (outboundPollRunning || !currentSocket || !status.connected) return;
+  outboundPollRunning = true;
+  try {
+    const socket = currentSocket;
+    const messages = await claimOutboundMessages(10);
+    for (const message of messages) {
+      try {
+        const sent = await socket.sendMessage(message.remote_jid, { text: message.content });
+        if (!sent?.key.id) throw new Error("WhatsApp did not return a message ID");
+        await completeOutboundMessage(message.outbound_id, sent.key.id, messageTimestamp(sent));
+        status.synced += 1;
+      } catch (error) {
+        status.failed += 1;
+        const reason = error instanceof Error ? error.message : String(error);
+        await failOutboundMessage(message.outbound_id, reason).catch((storeError) =>
+          log.error({ event: "outbound_failure_persist_failed", error: storeError.message }),
+        );
+        log.error({ event: "outbound_message_failed", error: reason });
+      }
+    }
+  } catch (error) {
+    log.error({
+      event: "outbound_poll_failed",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    outboundPollRunning = false;
+  }
+}
+
 startHealthServer(status);
+setInterval(() => void pollOutboundMessages(), 1200);
+setInterval(() => {
+  void heartbeat(status.connected, status.historyComplete).catch((error) =>
+    log.error({ event: "heartbeat_failed", error: error.message }),
+  );
+}, 30_000);
+
 start().catch((error) => {
   log.fatal({
     event: "startup_failed",
