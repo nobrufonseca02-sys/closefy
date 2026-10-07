@@ -26,8 +26,11 @@ e com a tabela `leads` do Closefy.
 
 1. Aplique, na ordem, as migrations `20261007150000_whatsapp_lead_sync.sql` e
    `20261007170000_whatsapp_inbox.sql` no Supabase do Closefy.
-2. Copie `.env.example` para `.env` e preencha `SUPABASE_URL` e
-   `SUPABASE_SERVICE_ROLE_KEY`. Nunca exponha a service role no frontend.
+2. Copie `.env.example` para `.env` e preencha `SUPABASE_URL`,
+   `SUPABASE_PUBLISHABLE_KEY` e `WHATSAPP_INTEGRATION_TOKEN`. O token deve
+   corresponder ao hash configurado pela migration do worker. Em projetos
+   Supabase tradicionais, `SUPABASE_SERVICE_ROLE_KEY` continua disponível como
+   alternativa e nunca deve ser exposta no frontend.
 3. Instale as dependências: `npm install` nesta pasta.
 4. Rode `npm run pair`. O terminal exibirá um código de oito caracteres.
 5. No celular do número `+55 21 99417-7491`, abra **WhatsApp > Configurações >

@@ -21,7 +21,12 @@ if (configuredPhone !== ALLOWED_BUSINESS_PHONE) {
 
 export const config = {
   supabaseUrl: required("SUPABASE_URL"),
-  supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
+  supabaseKey:
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    required("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_PUBLISHABLE_KEY"),
+  integrationToken: process.env.WHATSAPP_INTEGRATION_TOKEN?.trim() || null,
   businessPhoneDigits: configuredPhone,
   pairingMode: process.env.WHATSAPP_PAIRING_MODE === "true",
   authStateDir: process.env.WHATSAPP_AUTH_STATE_DIR?.trim() || "./auth_state",
