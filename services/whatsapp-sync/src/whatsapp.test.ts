@@ -32,7 +32,7 @@ test("resolves an anonymous LID through the synced contact directory", () => {
     {
       id: "987654321@lid",
       lid: "987654321@lid",
-      jid: "5521988888888@s.whatsapp.net",
+      phoneNumber: "5521988888888@s.whatsapp.net",
       name: "Cliente Teste",
     } satisfies Contact,
   ]);

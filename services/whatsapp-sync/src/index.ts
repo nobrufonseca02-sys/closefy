@@ -12,8 +12,10 @@ import makeWASocket, {
 import { config } from "./config.js";
 import { startHealthServer, type SyncStatus } from "./health.js";
 import { log } from "./logger.js";
+import { acquireSingleInstanceLock } from "./singleInstance.js";
 import {
   addContacts,
+  addLidMapping,
   extractMessage,
   isOneToOneJid,
   messageTimestamp,
@@ -57,8 +59,24 @@ function ownPhoneFromSocket(sock: WASocket): string | null {
   return digits.length >= 10 && digits.length <= 15 ? digits : null;
 }
 
+async function resolvePeerWithLidMapping(
+  remoteJid: string | null | undefined,
+  alternateJid?: string | null,
+) {
+  let peer = resolvePeer(remoteJid, contacts, alternateJid);
+  if (peer || !remoteJid || !currentSocket) return peer;
+
+  const normalized = jidNormalizedUser(remoteJid);
+  if (!normalized.endsWith("@lid")) return null;
+  const phoneJid = await currentSocket.signalRepository.lidMapping.getPNForLID(normalized);
+  if (!phoneJid) return null;
+  addLidMapping(contacts, normalized, phoneJid);
+  peer = resolvePeer(remoteJid, contacts, alternateJid);
+  return peer;
+}
+
 async function processMessage(message: WAMessage, isHistory = false): Promise<void> {
-  const peer = resolvePeer(message.key.remoteJid, contacts);
+  const peer = await resolvePeerWithLidMapping(message.key.remoteJid, message.key.remoteJidAlt);
   if (!peer) {
     const jid = message.key.remoteJid ? jidNormalizedUser(message.key.remoteJid) : null;
     if (jid?.endsWith("@lid")) {
@@ -106,7 +124,11 @@ async function processMessage(message: WAMessage, isHistory = false): Promise<vo
 }
 
 async function processChat(chat: Chat): Promise<void> {
-  const peer = resolvePeer(chat.id, contacts);
+  if (!chat.id) {
+    status.skipped += 1;
+    return;
+  }
+  const peer = await resolvePeerWithLidMapping(chat.id);
   if (!peer) {
     if (isOneToOneJid(chat.id) && jidNormalizedUser(chat.id).endsWith("@lid")) {
       pendingChats.set(jidNormalizedUser(chat.id), chat);
@@ -172,7 +194,7 @@ async function start(): Promise<void> {
   const { state, saveCreds } = await loadMultiFileAuthState(config.authStateDir);
   const sock = makeWASocket({
     auth: state,
-    browser: Browsers.macOS("Desktop"),
+    browser: Browsers.ubuntu("Chrome"),
     syncFullHistory: true,
     shouldSyncHistoryMessage: () => true,
     markOnlineOnConnect: false,
@@ -247,16 +269,18 @@ async function start(): Promise<void> {
     addContacts(contacts, updates as Contact[]);
     void retryPending();
   });
-  sock.ev.on("chats.phoneNumberShare", ({ lid, jid }) => {
-    const existing = contacts.get(jidNormalizedUser(lid));
-    addContacts(contacts, [{ ...(existing || {}), id: lid, lid, jid }]);
+  sock.ev.on("lid-mapping.update", ({ lid, pn }) => {
+    addLidMapping(contacts, lid, pn);
     void retryPending();
   });
 
   sock.ev.on(
     "messaging-history.set",
-    async ({ contacts: historyContacts, chats, messages, isLatest, progress }) => {
+    async ({ contacts: historyContacts, chats, messages, lidPnMappings, isLatest, progress }) => {
       addContacts(contacts, historyContacts);
+      for (const mapping of lidPnMappings || []) {
+        addLidMapping(contacts, mapping.lid, mapping.pn);
+      }
 
       const sortedMessages = [...messages].sort(
         (a, b) => messageTimestamp(a).getTime() - messageTimestamp(b).getTime(),
@@ -266,13 +290,14 @@ async function start(): Promise<void> {
       const chatsWithMessages = new Set(
         messages
           .map((message) => message.key.remoteJid)
-          .filter((jid): jid is string => Boolean(jid))
+          .filter((jid): jid is string => typeof jid === "string" && jid.length > 0)
           .map(jidNormalizedUser),
       );
       const chatsWithoutMessages = chats.filter(
-        (chat) => !chatsWithMessages.has(jidNormalizedUser(chat.id)),
+        (chat) => chat.id && !chatsWithMessages.has(jidNormalizedUser(chat.id)),
       );
       await syncWithConcurrency(chatsWithoutMessages, processChat);
+      await retryPending();
 
       if (isLatest || progress === 100) status.historyComplete = true;
       if (status.historyComplete) {
@@ -342,15 +367,32 @@ async function pollOutboundMessages(): Promise<void> {
   }
 }
 
-startHealthServer(status);
-setInterval(() => void pollOutboundMessages(), 1200);
-setInterval(() => {
-  void heartbeat(status.connected, status.historyComplete).catch((error) =>
-    log.error({ event: "heartbeat_failed", error: error.message }),
-  );
-}, 30_000);
+async function main(): Promise<void> {
+  const releaseLock = await acquireSingleInstanceLock(config.authStateDir);
+  const shutdown = async () => {
+    await releaseLock().catch((error) =>
+      log.error({ event: "worker_lock_release_failed", error: error.message }),
+    );
+  };
+  const handleSignal = async () => {
+    await shutdown();
+    process.exit(0);
+  };
+  process.once("SIGINT", () => void handleSignal());
+  process.once("SIGTERM", () => void handleSignal());
+  process.once("beforeExit", () => void shutdown());
 
-start().catch((error) => {
+  startHealthServer(status);
+  setInterval(() => void pollOutboundMessages(), 1200);
+  setInterval(() => {
+    void heartbeat(status.connected, status.historyComplete).catch((error) =>
+      log.error({ event: "heartbeat_failed", error: error.message }),
+    );
+  }, 30_000);
+  await start();
+}
+
+main().catch((error) => {
   log.fatal({
     event: "startup_failed",
     error: error instanceof Error ? error.message : String(error),

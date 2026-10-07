@@ -18,21 +18,41 @@ export function contactName(contact: Contact | undefined): string | null {
 
 export function addContacts(directory: ContactDirectory, contacts: Contact[]): void {
   for (const contact of contacts) {
-    for (const id of [contact.id, contact.jid, contact.lid]) {
+    for (const id of [contact.id, contact.phoneNumber, contact.lid]) {
       if (id) directory.set(jidNormalizedUser(id), contact);
     }
   }
 }
 
+export function addLidMapping(directory: ContactDirectory, lid: string, phoneNumber: string): void {
+  const normalizedLid = jidNormalizedUser(lid);
+  const normalizedPhone = jidNormalizedUser(phoneNumber);
+  const existing = directory.get(normalizedLid) || directory.get(normalizedPhone);
+  addContacts(directory, [
+    {
+      ...(existing || {}),
+      id: normalizedLid,
+      lid: normalizedLid,
+      phoneNumber: normalizedPhone,
+    },
+  ]);
+}
+
 export function resolvePeer(
   remoteJid: string | null | undefined,
   directory: ContactDirectory,
+  alternateJid?: string | null,
 ): { remoteJid: string; phone: string; displayName: string | null } | null {
   if (!isOneToOneJid(remoteJid)) return null;
 
   const normalized = jidNormalizedUser(remoteJid);
   const contact = directory.get(normalized);
-  const phoneJid = contact?.jid ? jidNormalizedUser(contact.jid) : normalized;
+  const normalizedAlternate = alternateJid ? jidNormalizedUser(alternateJid) : null;
+  const phoneJid = contact?.phoneNumber
+    ? jidNormalizedUser(contact.phoneNumber)
+    : normalizedAlternate?.endsWith("@s.whatsapp.net") || normalizedAlternate?.endsWith("@c.us")
+      ? normalizedAlternate
+      : normalized;
 
   if (!phoneJid.endsWith("@s.whatsapp.net") && !phoneJid.endsWith("@c.us")) return null;
   const phoneDigits = phoneJid.split("@")[0]?.replace(/\D/g, "") || "";

@@ -4,6 +4,12 @@ Worker dedicado ao número `+55 21 99417-7491`. Ele conecta o WhatsApp como um
 aparelho vinculado e mantém as conversas individuais sincronizadas com o inbox
 e com a tabela `leads` do Closefy.
 
+Este modo não gera cobrança por mensagem da Cloud API, mas usa um protocolo de
+aparelho vinculado que não é uma integração oficial da Meta. Por isso, não há
+garantia de risco zero de restrição. O serviço reduz o risco operacional com
+uma única sessão, trava de instância, reconexão reaproveitando credenciais e
+deduplicação dos IDs de mensagem.
+
 ## Comportamento
 
 - No primeiro pareamento, solicita o histórico disponível ao WhatsApp e importa
@@ -18,6 +24,10 @@ e com a tabela `leads` do Closefy.
   de mensagem ou legenda.
 - Telefone e JID são reconciliados pela função transacional
   `sync_whatsapp_lead`, evitando duplicidade em eventos simultâneos.
+- Identificadores privados `LID` são resolvidos pelo mapa criptográfico enviado
+  pelo celular antes da criação do cliente.
+- Uma trava no diretório de autenticação impede duas instâncias locais de usar
+  o mesmo número ao mesmo tempo.
 - Lead iniciado pela empresa entra em `prospectando`; ao receber mensagem do
   cliente, avança de `prospectando` para `conectado`. Etapas mais avançadas nunca
   são regredidas pela automação.
@@ -40,6 +50,9 @@ e com a tabela `leads` do Closefy.
    **Conversas** mostrará o indicador **Conectado**.
 7. Após o pareamento, mantenha `npm start` rodando em um serviço persistente com
    volume durável montado em `WHATSAPP_AUTH_STATE_DIR`.
+
+Não execute `npm run pair` novamente enquanto o aparelho estiver vinculado. Em
+reinícios normais, use apenas `npm start`; ele reaproveita a sessão existente.
 
 O endpoint `GET /health` retorna 200 quando a conexão está ativa e informa o
 progresso e os contadores da sincronização. O worker recusa qualquer conta
