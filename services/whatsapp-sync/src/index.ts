@@ -16,6 +16,7 @@ import { acquireSingleInstanceLock } from "./singleInstance.js";
 import {
   addContacts,
   addLidMapping,
+  downloadAudioBuffer,
   extractMessage,
   isOneToOneJid,
   messageTimestamp,
@@ -30,6 +31,7 @@ import {
   syncConversation,
   syncMessage as persistMessage,
   updateMessageDelivery,
+  uploadAudioMedia,
 } from "./whatsappStore.js";
 
 const contacts: ContactDirectory = new Map();
@@ -101,6 +103,26 @@ async function processMessage(message: WAMessage, isHistory = false): Promise<vo
     return;
   }
 
+  const waMessageId = message.key.id || `${peer.remoteJid}:${messageTimestamp(message).getTime()}`;
+  let mediaPath: string | null = null;
+  if (extracted.type === "audio" && currentSocket) {
+    try {
+      const downloaded = await downloadAudioBuffer(
+        message,
+        currentSocket,
+        log.child({ component: "baileys-media" }),
+      );
+      if (downloaded) {
+        mediaPath = await uploadAudioMedia(waMessageId, downloaded.buffer, downloaded.mimetype);
+      }
+    } catch (error) {
+      log.error({
+        event: "audio_media_failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   try {
     await persistMessage({
       ...peer,
@@ -108,10 +130,11 @@ async function processMessage(message: WAMessage, isHistory = false): Promise<vo
         peer.displayName || (!message.key.fromMe ? message.pushName?.trim() || null : null),
       activityAt: messageTimestamp(message),
       fromMe: Boolean(message.key.fromMe),
-      waMessageId: message.key.id || `${peer.remoteJid}:${messageTimestamp(message).getTime()}`,
+      waMessageId,
       content: extracted.content,
       messageType: extracted.type,
       isHistory,
+      mediaPath,
     });
     status.synced += 1;
   } catch (error) {

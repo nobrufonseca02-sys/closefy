@@ -48,11 +48,21 @@ deduplicação dos IDs de mensagem.
    telefone** e digite o código.
 6. Aguarde o log `whatsapp_connected` e a sincronização do histórico. A aba
    **Conversas** mostrará o indicador **Conectado**.
-7. Após o pareamento, mantenha `npm start` rodando em um serviço persistente com
-   volume durável montado em `WHATSAPP_AUTH_STATE_DIR`.
+7. Após o pareamento, mantenha o worker rodando em um serviço persistente com
+   volume durável montado em `WHATSAPP_AUTH_STATE_DIR`. No Windows, use o PM2
+   com o `ecosystem.config.cjs` desta pasta em vez de `pm2 start` solto, ele
+   limita o número de reinícios automáticos (`max_restarts`) e usa backoff
+   crescente, o que evita o worker reiniciar em loop infinito (janela de cmd
+   piscando sem parar) se o PM2 perder o rastro do processo depois que o
+   Windows volta da suspensão:
+   ```
+   pm2 start ecosystem.config.cjs
+   pm2 save
+   ```
 
 Não execute `npm run pair` novamente enquanto o aparelho estiver vinculado. Em
-reinícios normais, use apenas `npm start`; ele reaproveita a sessão existente.
+reinícios normais, use `pm2 restart closefy-whatsapp`; ele reaproveita a sessão
+existente.
 
 O endpoint `GET /health` retorna 200 quando a conexão está ativa e informa o
 progresso e os contadores da sincronização. O worker recusa qualquer conta

@@ -33,6 +33,7 @@ import {
   useRetryWhatsAppMessage,
   useSendWhatsAppMessage,
   useStartWhatsAppConversation,
+  useWhatsAppAudioUrl,
   useWhatsAppConnection,
   useWhatsAppConversations,
   useWhatsAppMessages,
@@ -418,7 +419,11 @@ function MessageBubble({ message, onRetry }: { message: WhatsAppMessage; onRetry
             : "rounded-bl-md border bg-card text-card-foreground",
         )}
       >
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        {message.message_type === "audio" && message.media_path ? (
+          <AudioMessageContent path={message.media_path} fallback={message.content} />
+        ) : (
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        )}
         <div
           className={cn(
             "mt-1 flex items-center justify-end gap-1 text-[10px]",
@@ -441,6 +446,27 @@ function MessageBubble({ message, onRetry }: { message: WhatsAppMessage; onRetry
         )}
       </div>
     </div>
+  );
+}
+
+function AudioMessageContent({ path, fallback }: { path: string; fallback: string }) {
+  const { data: url, isLoading, isError } = useWhatsAppAudioUrl(path);
+
+  if (isLoading) {
+    return (
+      <p className="whitespace-pre-wrap break-words text-sm italic opacity-70">
+        Carregando áudio...
+      </p>
+    );
+  }
+  if (isError || !url) {
+    return <p className="whitespace-pre-wrap break-words">{fallback}</p>;
+  }
+  return (
+    <audio controls preload="none" className="h-10 w-56 max-w-full sm:w-64">
+      <source src={url} />
+      Seu navegador não suporta reprodução de áudio.
+    </audio>
   );
 }
 

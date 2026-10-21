@@ -32,7 +32,34 @@ export type MessageSyncInput = ConversationSyncInput & {
   content: string;
   messageType: string;
   isHistory: boolean;
+  mediaPath?: string | null;
 };
+
+const AUDIO_BUCKET = "whatsapp-audio";
+
+function audioExtension(mimetype: string): string {
+  const subtype = mimetype.split(";")[0]?.split("/")[1]?.trim().toLowerCase();
+  if (subtype === "ogg") return "ogg";
+  if (subtype === "mp4" || subtype === "m4a" || subtype === "aac") return "m4a";
+  if (subtype === "mpeg" || subtype === "mp3") return "mp3";
+  if (subtype === "webm") return "webm";
+  if (subtype === "wav" || subtype === "x-wav") return "wav";
+  return "bin";
+}
+
+export async function uploadAudioMedia(
+  waMessageId: string,
+  buffer: Buffer,
+  mimetype: string,
+): Promise<string> {
+  const safeId = waMessageId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const path = `${safeId}.${audioExtension(mimetype)}`;
+  const { error } = await supabase.storage
+    .from(AUDIO_BUCKET)
+    .upload(path, buffer, { contentType: mimetype, upsert: true });
+  if (error) throw new Error(`Could not upload WhatsApp audio: ${error.message}`);
+  return path;
+}
 
 export type ClaimedOutboundMessage = {
   outbound_id: string;
@@ -59,24 +86,45 @@ export async function syncConversation(input: ConversationSyncInput): Promise<st
   return data as string;
 }
 
+function isMissingMediaPathOverload(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === "PGRST202" &&
+    typeof error.message === "string" &&
+    error.message.includes("p_media_path")
+  );
+}
+
 export async function syncMessage(input: MessageSyncInput): Promise<string> {
+  const baseParams = {
+    p_business_phone: config.businessPhoneDigits,
+    p_remote_jid: input.remoteJid,
+    p_phone_number: input.phone,
+    p_display_name: input.displayName,
+    p_wa_message_id: input.waMessageId,
+    p_content: input.content,
+    p_message_type: input.messageType,
+    p_message_at: input.activityAt.toISOString(),
+    p_from_me: input.fromMe,
+    p_is_history: input.isHistory,
+  };
+
   const { data, error } = await supabase.rpc(
     workerRpc("sync_whatsapp_message"),
-    workerParams({
-      p_business_phone: config.businessPhoneDigits,
-      p_remote_jid: input.remoteJid,
-      p_phone_number: input.phone,
-      p_display_name: input.displayName,
-      p_wa_message_id: input.waMessageId,
-      p_content: input.content,
-      p_message_type: input.messageType,
-      p_message_at: input.activityAt.toISOString(),
-      p_from_me: input.fromMe,
-      p_is_history: input.isHistory,
-    }),
+    workerParams({ ...baseParams, p_media_path: input.mediaPath ?? null }),
   );
-  if (error) throw new Error(`Closefy message sync failed: ${error.message}`);
-  return data as string;
+  if (!error) return data as string;
+
+  // The media_path migration may not be applied yet on this project. Fall
+  // back to the pre-migration call shape so plain message sync never breaks
+  // because of an audio-only feature lagging behind in the database.
+  if (!isMissingMediaPathOverload(error)) {
+    throw new Error(`Closefy message sync failed: ${error.message}`);
+  }
+  const fallback = await supabase.rpc(workerRpc("sync_whatsapp_message"), workerParams(baseParams));
+  if (fallback.error) {
+    throw new Error(`Closefy message sync failed: ${fallback.error.message}`);
+  }
+  return fallback.data as string;
 }
 
 export async function claimOutboundMessages(limit = 10): Promise<ClaimedOutboundMessage[]> {

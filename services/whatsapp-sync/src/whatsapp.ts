@@ -1,4 +1,11 @@
-import { jidNormalizedUser, type Contact, type WAMessage } from "@whiskeysockets/baileys";
+import {
+  downloadMediaMessage,
+  jidNormalizedUser,
+  type Contact,
+  type WAMessage,
+  type WASocket,
+} from "@whiskeysockets/baileys";
+import type { Logger } from "pino";
 
 export type ContactDirectory = Map<string, Contact>;
 
@@ -88,7 +95,7 @@ export type ExtractedMessage = {
   content: string;
 };
 
-function unwrapMessage(message: WAMessage["message"]) {
+export function unwrapMessage(message: WAMessage["message"]) {
   return (
     message?.ephemeralMessage?.message ||
     message?.viewOnceMessage?.message ||
@@ -145,4 +152,34 @@ export function extractMessage(message: WAMessage): ExtractedMessage | null {
 
   if (content.protocolMessage || content.senderKeyDistributionMessage) return null;
   return { type: "unknown", content: "Mensagem não suportada" };
+}
+
+export type DownloadedAudio = {
+  buffer: Buffer;
+  mimetype: string;
+};
+
+/**
+ * Downloads a voice note's bytes. Separate from extractMessage (which stays
+ * synchronous and media-free, see whatsapp.test.ts) because this needs the
+ * live socket for Baileys' reupload-on-expiry flow.
+ */
+export async function downloadAudioBuffer(
+  message: WAMessage,
+  sock: WASocket,
+  logger: Logger,
+): Promise<DownloadedAudio | null> {
+  const audio = unwrapMessage(message.message)?.audioMessage;
+  if (!audio) return null;
+  try {
+    const buffer = (await downloadMediaMessage(
+      message,
+      "buffer",
+      {},
+      { logger, reuploadRequest: sock.updateMediaMessage },
+    )) as Buffer;
+    return { buffer, mimetype: audio.mimetype || "audio/ogg" };
+  } catch {
+    return null;
+  }
 }

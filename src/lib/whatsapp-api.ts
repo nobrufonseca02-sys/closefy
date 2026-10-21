@@ -46,6 +46,21 @@ export function useWhatsAppMessages(conversationId: string | null) {
   });
 }
 
+export function useWhatsAppAudioUrl(path: string | null) {
+  return useQuery({
+    queryKey: ["whatsapp-audio-url", path],
+    enabled: Boolean(path),
+    queryFn: async (): Promise<string> => {
+      const { data, error } = await supabase.storage
+        .from("whatsapp-audio")
+        .createSignedUrl(path!, 3600);
+      if (error) throw error;
+      return data.signedUrl;
+    },
+    staleTime: 45 * 60 * 1000,
+  });
+}
+
 export function useWhatsAppConnection() {
   return useQuery({
     queryKey: whatsappConnectionKey,

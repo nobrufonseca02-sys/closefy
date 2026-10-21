@@ -30,6 +30,7 @@ export type WhatsAppMessage = {
     | "reaction"
     | "unknown";
   content: string;
+  media_path: string | null;
   is_history: boolean;
   status: "pending" | "sending" | "sent" | "delivered" | "read" | "received" | "failed";
   error_message: string | null;

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Contact } from "@whiskeysockets/baileys";
+import type { Contact, WASocket } from "@whiskeysockets/baileys";
+import type { Logger } from "pino";
 import {
   addContacts,
+  downloadAudioBuffer,
   extractMessage,
   isOneToOneJid,
   resolvePeer,
@@ -57,4 +59,13 @@ test("extracts text and media placeholders without downloading media", () => {
     type: "audio",
     content: "🎵 Áudio",
   });
+});
+
+test("skips audio download entirely for non-audio messages", async () => {
+  const result = await downloadAudioBuffer(
+    { message: { conversation: "oi" }, key: {} } as never,
+    {} as WASocket,
+    {} as Logger,
+  );
+  assert.equal(result, null);
 });
