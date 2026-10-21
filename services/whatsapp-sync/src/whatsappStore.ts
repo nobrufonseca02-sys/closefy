@@ -5,6 +5,16 @@ const supabase = createClient(config.supabaseUrl, config.supabaseKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+// Storage has no SECURITY DEFINER-style wrapper to lean on like the RPC
+// calls do, so bucket writes need an actually privileged client. Falls back
+// to the regular client (which will just hit the bucket's RLS policy and
+// fail, same as before) if no service role key is configured yet.
+const storageClient = config.serviceRoleKey
+  ? createClient(config.supabaseUrl, config.serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+  : supabase;
+
 function workerRpc(name: string): string {
   return config.integrationToken ? `worker_${name}` : name;
 }
@@ -54,7 +64,7 @@ export async function uploadAudioMedia(
 ): Promise<string> {
   const safeId = waMessageId.replace(/[^a-zA-Z0-9_-]/g, "_");
   const path = `${safeId}.${audioExtension(mimetype)}`;
-  const { error } = await supabase.storage
+  const { error } = await storageClient.storage
     .from(AUDIO_BUCKET)
     .upload(path, buffer, { contentType: mimetype, upsert: true });
   if (error) throw new Error(`Could not upload WhatsApp audio: ${error.message}`);

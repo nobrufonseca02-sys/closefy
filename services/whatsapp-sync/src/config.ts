@@ -26,6 +26,14 @@ export const config = {
     process.env.SUPABASE_PUBLISHABLE_KEY?.trim() ||
     process.env.SUPABASE_ANON_KEY?.trim() ||
     required("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_PUBLISHABLE_KEY"),
+  // Kept separate from supabaseKey on purpose: the Lovable Cloud / integration
+  // token deployment uses the publishable key plus worker_* RPC wrappers for
+  // everything, including when this is also set. Storage has no equivalent
+  // wrapper (uploads hit the Storage API directly, not a SQL function we
+  // control), so it's the one thing that genuinely needs service-role to
+  // bypass bucket RLS. Optional: audio upload just logs and falls back to a
+  // text placeholder until this is configured.
+  serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null,
   integrationToken: process.env.WHATSAPP_INTEGRATION_TOKEN?.trim() || null,
   businessPhoneDigits: configuredPhone,
   pairingMode: process.env.WHATSAPP_PAIRING_MODE === "true",
