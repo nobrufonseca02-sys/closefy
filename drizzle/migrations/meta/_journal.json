@@ -8,6 +8,13 @@
       "when": 1793030298999,
       "tag": "0000_whatsapp_outbound_audio",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793030317693,
+      "tag": "0001_grant_whatsapp_worker_token_verification",
+      "breakpoints": true
     }
   ]
 }
