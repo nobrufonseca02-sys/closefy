@@ -10,6 +10,9 @@ import makeWASocket, {
   type WAMessage,
   type WASocket,
 } from "@whiskeysockets/baileys";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import QRCode from "qrcode";
 import { config } from "./config.js";
 import { startHealthServer, type SyncStatus } from "./health.js";
 import { log } from "./logger.js";
@@ -27,6 +30,7 @@ import {
 import {
   claimOutboundMessages,
   completeOutboundMessage,
+  downloadOutboundAudio,
   failOutboundMessage,
   heartbeat,
   syncConversation,
@@ -263,7 +267,16 @@ async function start(): Promise<void> {
     }, 3000);
   }
 
-  sock.ev.on("connection.update", ({ connection, lastDisconnect }) => {
+  sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+    if (qr) {
+      const qrPath = path.join(config.authStateDir, "pairing-qr.png");
+      void QRCode.toFile(qrPath, qr, { width: 512 })
+        .then(() =>
+          log.info({ event: "qr_code_ready", path: qrPath, message: "Scan this with WhatsApp > Aparelhos conectados > Conectar um aparelho" }),
+        )
+        .catch((error) => log.error({ event: "qr_code_write_failed", error: error.message }));
+    }
+
     if (connection === "open") {
       const ownPhone = ownPhoneFromSocket(sock);
       if (ownPhone && ownPhone !== config.businessPhoneDigits) {
@@ -386,7 +399,17 @@ async function pollOutboundMessages(): Promise<void> {
     const messages = await claimOutboundMessages(10);
     for (const message of messages) {
       try {
-        const sent = await socket.sendMessage(message.remote_jid, { text: message.content });
+        const sent =
+          message.message_type === "audio" && message.media_path
+            ? await (async () => {
+                const { buffer, mimetype } = await downloadOutboundAudio(message.media_path!);
+                return socket.sendMessage(message.remote_jid, {
+                  audio: buffer,
+                  mimetype,
+                  ptt: true,
+                });
+              })()
+            : await socket.sendMessage(message.remote_jid, { text: message.content });
         if (!sent?.key.id) throw new Error("WhatsApp did not return a message ID");
         await completeOutboundMessage(message.outbound_id, sent.key.id, messageTimestamp(sent));
         status.synced += 1;

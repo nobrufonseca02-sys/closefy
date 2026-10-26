@@ -8,10 +8,13 @@ import {
   CheckCheck,
   Clock3,
   Loader2,
+  Mic,
   MessageCircle,
   RefreshCw,
   Search,
   Send,
+  Square,
+  Trash2,
   UserRoundPlus,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -31,6 +34,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   useMarkWhatsAppConversationRead,
   useRetryWhatsAppMessage,
+  useSendWhatsAppAudioMessage,
   useSendWhatsAppMessage,
   useStartWhatsAppConversation,
   useWhatsAppAudioUrl,
@@ -267,6 +271,63 @@ function ConversationRow({
   );
 }
 
+type VoiceRecorderState =
+  | { phase: "idle" }
+  | { phase: "recording"; startedAt: number }
+  | { phase: "recorded"; blob: Blob; url: string; durationMs: number };
+
+function useVoiceRecorder() {
+  const [state, setState] = useState<VoiceRecorderState>({ phase: "idle" });
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const stopStream = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  };
+
+  const start = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamRef.current = stream;
+    const recorder = new MediaRecorder(stream);
+    chunksRef.current = [];
+    const startedAt = Date.now();
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      stopStream();
+      setState({ phase: "recorded", blob, url: URL.createObjectURL(blob), durationMs: Date.now() - startedAt });
+    };
+    recorder.start();
+    recorderRef.current = recorder;
+    setState({ phase: "recording", startedAt });
+  };
+
+  const stop = () => {
+    recorderRef.current?.stop();
+  };
+
+  const discard = () => {
+    if (state.phase === "recorded") URL.revokeObjectURL(state.url);
+    setState({ phase: "idle" });
+  };
+
+  const cancelRecording = () => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.ondataavailable = null;
+      recorderRef.current.onstop = null;
+      recorderRef.current.stop();
+    }
+    stopStream();
+    setState({ phase: "idle" });
+  };
+
+  return { state, start, stop, discard, cancelRecording };
+}
+
 function ConversationThread({
   conversation,
   connected,
@@ -278,10 +339,12 @@ function ConversationThread({
 }) {
   const { data: messages = [], isLoading } = useWhatsAppMessages(conversation.id);
   const sendMessage = useSendWhatsAppMessage();
+  const sendAudio = useSendWhatsAppAudioMessage();
   const { mutate: markRead } = useMarkWhatsAppConversationRead();
   const retry = useRetryWhatsAppMessage();
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const recorder = useVoiceRecorder();
 
   useEffect(() => {
     if (conversation.unread_count > 0) markRead(conversation.id);
@@ -290,6 +353,11 @@ function ConversationThread({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  useEffect(() => {
+    return () => recorder.cancelRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation.id]);
 
   const submit = async () => {
     const content = draft.trim();
@@ -300,6 +368,19 @@ function ConversationThread({
     } catch (error) {
       setDraft(content);
       toast.error("Não foi possível colocar a mensagem na fila", {
+        description: (error as Error).message,
+      });
+    }
+  };
+
+  const submitAudio = async () => {
+    if (recorder.state.phase !== "recorded" || !connected || sendAudio.isPending) return;
+    const { blob } = recorder.state;
+    try {
+      await sendAudio.mutateAsync({ conversationId: conversation.id, blob });
+      recorder.discard();
+    } catch (error) {
+      toast.error("Não foi possível enviar o áudio", {
         description: (error as Error).message,
       });
     }
@@ -374,33 +455,98 @@ function ConversationThread({
       )}
       <div className="shrink-0 border-t bg-card p-2.5 sm:p-3">
         <div className="mx-auto flex max-w-3xl items-end gap-2">
-          <Textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void submit();
-              }
-            }}
-            disabled={!connected}
-            rows={1}
-            maxLength={4000}
-            placeholder={connected ? "Digite uma mensagem..." : "WhatsApp desconectado"}
-            className="max-h-32 min-h-10 resize-none text-base sm:text-sm"
-          />
-          <Button
-            size="icon"
-            disabled={!connected || !draft.trim() || sendMessage.isPending}
-            onClick={() => void submit()}
-            aria-label="Enviar mensagem"
-          >
-            {sendMessage.isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Send className="size-4" />
-            )}
-          </Button>
+          {recorder.state.phase === "recording" ? (
+            <>
+              <div className="flex h-10 flex-1 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
+                <span className="size-2 animate-pulse rounded-full bg-destructive" />
+                Gravando áudio...
+              </div>
+              <Button
+                size="icon"
+                variant="destructive"
+                onClick={recorder.stop}
+                aria-label="Parar gravação"
+              >
+                <Square className="size-4" />
+              </Button>
+            </>
+          ) : recorder.state.phase === "recorded" ? (
+            <>
+              <div className="flex h-10 flex-1 items-center gap-2 rounded-md border px-2">
+                <audio controls preload="metadata" className="h-9 w-full">
+                  <source src={recorder.state.url} />
+                </audio>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={recorder.discard}
+                disabled={sendAudio.isPending}
+                aria-label="Descartar áudio"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+              <Button
+                size="icon"
+                disabled={!connected || sendAudio.isPending}
+                onClick={() => void submitAudio()}
+                aria-label="Enviar áudio"
+              >
+                {sendAudio.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Send className="size-4" />
+                )}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void submit();
+                  }
+                }}
+                disabled={!connected}
+                rows={1}
+                maxLength={4000}
+                placeholder={connected ? "Digite uma mensagem..." : "WhatsApp desconectado"}
+                className="max-h-32 min-h-10 resize-none text-base sm:text-sm"
+              />
+              {draft.trim() ? (
+                <Button
+                  size="icon"
+                  disabled={!connected || sendMessage.isPending}
+                  onClick={() => void submit()}
+                  aria-label="Enviar mensagem"
+                >
+                  {sendMessage.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  size="icon"
+                  disabled={!connected}
+                  onClick={() =>
+                    void recorder.start().catch(() =>
+                      toast.error("Não foi possível acessar o microfone", {
+                        description: "Verifique a permissão de áudio do navegador.",
+                      }),
+                    )
+                  }
+                  aria-label="Gravar áudio"
+                >
+                  <Mic className="size-4" />
+                </Button>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -442,6 +442,7 @@ export type Database = {
           error_message: string | null
           id: string
           is_history: boolean
+          media_path: string | null
           message_type: string
           sent_at: string
           status: string
@@ -457,6 +458,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           is_history?: boolean
+          media_path?: string | null
           message_type?: string
           sent_at?: string
           status?: string
@@ -472,6 +474,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           is_history?: boolean
+          media_path?: string | null
           message_type?: string
           sent_at?: string
           status?: string

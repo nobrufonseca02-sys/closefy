@@ -110,6 +110,54 @@ export function useSendWhatsAppMessage() {
   });
 }
 
+function audioExtension(mimetype: string): string {
+  const subtype = mimetype.split(";")[0]?.split("/")[1]?.trim().toLowerCase();
+  if (subtype === "ogg") return "ogg";
+  if (subtype === "webm") return "webm";
+  if (subtype === "mp4" || subtype === "m4a" || subtype === "aac") return "m4a";
+  return "bin";
+}
+
+export function useSendWhatsAppAudioMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      blob,
+    }: {
+      conversationId: string;
+      blob: Blob;
+    }) => {
+      const path = `outbound/${conversationId}/${crypto.randomUUID()}.${audioExtension(blob.type)}`;
+      const { error: uploadError } = await supabase.storage
+        .from("whatsapp-audio")
+        .upload(path, blob, { contentType: blob.type || "audio/webm" });
+      if (uploadError) throw uploadError;
+
+      const { data, error } = await supabase
+        .from("whatsapp_messages")
+        .insert({
+          conversation_id: conversationId,
+          direction: "outbound",
+          message_type: "audio",
+          content: "🎵 Áudio",
+          media_path: path,
+          status: "pending",
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as WhatsAppMessage;
+    },
+    onSuccess: (message) => {
+      void queryClient.invalidateQueries({
+        queryKey: whatsappMessagesKey(message.conversation_id),
+      });
+      void queryClient.invalidateQueries({ queryKey: whatsappConversationsKey });
+    },
+  });
+}
+
 export function useStartWhatsAppConversation() {
   const queryClient = useQueryClient();
   return useMutation({

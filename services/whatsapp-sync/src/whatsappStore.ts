@@ -73,8 +73,30 @@ export type ClaimedOutboundMessage = {
   remote_jid: string;
   phone_number: string;
   content: string;
+  message_type: string;
+  media_path: string | null;
   attempts: number;
 };
+
+export async function downloadOutboundAudio(
+  mediaPath: string,
+): Promise<{ buffer: Buffer; mimetype: string }> {
+  if (!config.integrationToken) {
+    throw new Error("WHATSAPP_INTEGRATION_TOKEN is required to send WhatsApp audio");
+  }
+  const url = new URL(`${config.supabaseUrl}/functions/v1/whatsapp-audio-download`);
+  url.searchParams.set("path", mediaPath);
+  const response = await fetch(url, {
+    headers: { "x-integration-token": config.integrationToken },
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(`Could not download WhatsApp audio: ${payload?.error || response.statusText}`);
+  }
+  const mimetype = response.headers.get("content-type") || "audio/ogg";
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return { buffer, mimetype };
+}
 
 export async function syncConversation(input: ConversationSyncInput): Promise<string> {
   const { data, error } = await supabase.rpc(

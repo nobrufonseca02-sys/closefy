@@ -5,3 +5,6 @@ project_id = "anqjlcrwjwmwuanewbje"
 # checks itself (see verify_whatsapp_worker_token), not a Supabase JWT.
 verify_jwt = false
 
+[functions.whatsapp-audio-download]
+verify_jwt = false
+
