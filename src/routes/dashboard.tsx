@@ -12,7 +12,14 @@ import { formatCurrency } from "@/lib/domain";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
-    meta: [{ title: "Dashboard | Closefy" }],
+    meta: [
+      { title: "Dashboard | Closefy" },
+      { name: "description", content: "Acompanhe prioridades, resultados e indicadores comerciais no Closefy." },
+      { property: "og:title", content: "Dashboard | Closefy" },
+      { property: "og:description", content: "Acompanhe prioridades, resultados e indicadores comerciais no Closefy." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
   }),
   component: DashboardPage,
 });

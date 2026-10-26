@@ -8,6 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
+  head: () => ({ meta: [
+    { title: "Entrar | Closefy" },
+    { name: "description", content: "Acesse sua conta Closefy para gerenciar sua operação comercial." },
+    { property: "og:title", content: "Entrar | Closefy" },
+    { property: "og:description", content: "Acesse sua conta Closefy para gerenciar sua operação comercial." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: LoginPage,
 });
 

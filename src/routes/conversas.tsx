@@ -56,7 +56,14 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/conversas")({
-  head: () => ({ meta: [{ title: "Conversas | Closefy" }] }),
+  head: () => ({ meta: [
+    { title: "Conversas | Closefy" },
+    { name: "description", content: "Acompanhe conversas e mensagens de WhatsApp dos seus contatos no Closefy." },
+    { property: "og:title", content: "Conversas | Closefy" },
+    { property: "og:description", content: "Acompanhe conversas e mensagens de WhatsApp dos seus contatos no Closefy." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: ConversationsPage,
 });
 
