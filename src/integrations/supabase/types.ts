@@ -520,6 +520,8 @@ export type Database = {
           attempts: number
           content: string
           conversation_id: string
+          media_path: string
+          message_type: string
           outbound_id: string
           phone_number: string
           remote_jid: string
@@ -630,6 +632,8 @@ export type Database = {
           attempts: number
           content: string
           conversation_id: string
+          media_path: string
+          message_type: string
           outbound_id: string
           phone_number: string
           remote_jid: string
