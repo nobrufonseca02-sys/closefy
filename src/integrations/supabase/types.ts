@@ -491,11 +491,61 @@ export type Database = {
           },
         ]
       }
+      whatsapp_worker_credentials: {
+        Row: {
+          singleton: boolean
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          singleton?: boolean
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          singleton?: boolean
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      claim_whatsapp_outbound_messages: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          content: string
+          conversation_id: string
+          outbound_id: string
+          phone_number: string
+          remote_jid: string
+        }[]
+      }
+      complete_whatsapp_outbound_message: {
+        Args: {
+          p_message_id: string
+          p_sent_at?: string
+          p_wa_message_id: string
+        }
+        Returns: undefined
+      }
+      fail_whatsapp_outbound_message: {
+        Args: { p_error_message: string; p_message_id: string }
+        Returns: undefined
+      }
+      heartbeat_whatsapp_connection: {
+        Args: {
+          p_business_phone: string
+          p_connected: boolean
+          p_error_message?: string
+          p_history_complete: boolean
+        }
+        Returns: undefined
+      }
       mark_whatsapp_conversation_read: {
         Args: { p_conversation_id: string }
         Returns: undefined
@@ -511,6 +561,160 @@ export type Database = {
           p_phone_number: string
         }
         Returns: string
+      }
+      sync_whatsapp_conversation: {
+        Args: {
+          p_activity_at?: string
+          p_business_phone: string
+          p_display_name?: string
+          p_from_me?: boolean
+          p_phone_number: string
+          p_remote_jid: string
+        }
+        Returns: string
+      }
+      sync_whatsapp_lead: {
+        Args: {
+          p_business_phone: string
+          p_display_name?: string
+          p_from_me?: boolean
+          p_message_at?: string
+          p_phone_number: string
+          p_remote_jid: string
+        }
+        Returns: string
+      }
+      sync_whatsapp_message:
+        | {
+            Args: {
+              p_business_phone: string
+              p_content: string
+              p_display_name: string
+              p_from_me: boolean
+              p_is_history?: boolean
+              p_message_at: string
+              p_message_type: string
+              p_phone_number: string
+              p_remote_jid: string
+              p_wa_message_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_business_phone: string
+              p_content: string
+              p_display_name: string
+              p_from_me: boolean
+              p_is_history?: boolean
+              p_media_path?: string
+              p_message_at: string
+              p_message_type: string
+              p_phone_number: string
+              p_remote_jid: string
+              p_wa_message_id: string
+            }
+            Returns: string
+          }
+      update_whatsapp_message_delivery: {
+        Args: { p_status: string; p_wa_message_id: string }
+        Returns: undefined
+      }
+      verify_whatsapp_worker_token: {
+        Args: { p_integration_token: string }
+        Returns: undefined
+      }
+      worker_claim_whatsapp_outbound_messages: {
+        Args: { p_integration_token: string; p_limit?: number }
+        Returns: {
+          attempts: number
+          content: string
+          conversation_id: string
+          outbound_id: string
+          phone_number: string
+          remote_jid: string
+        }[]
+      }
+      worker_complete_whatsapp_outbound_message: {
+        Args: {
+          p_integration_token: string
+          p_message_id: string
+          p_sent_at?: string
+          p_wa_message_id: string
+        }
+        Returns: undefined
+      }
+      worker_fail_whatsapp_outbound_message: {
+        Args: {
+          p_error_message: string
+          p_integration_token: string
+          p_message_id: string
+        }
+        Returns: undefined
+      }
+      worker_heartbeat_whatsapp_connection: {
+        Args: {
+          p_business_phone: string
+          p_connected: boolean
+          p_error_message?: string
+          p_history_complete: boolean
+          p_integration_token: string
+        }
+        Returns: undefined
+      }
+      worker_sync_whatsapp_conversation: {
+        Args: {
+          p_activity_at?: string
+          p_business_phone: string
+          p_display_name?: string
+          p_from_me?: boolean
+          p_integration_token: string
+          p_phone_number: string
+          p_remote_jid: string
+        }
+        Returns: string
+      }
+      worker_sync_whatsapp_message:
+        | {
+            Args: {
+              p_business_phone: string
+              p_content: string
+              p_display_name: string
+              p_from_me: boolean
+              p_integration_token: string
+              p_is_history?: boolean
+              p_message_at: string
+              p_message_type: string
+              p_phone_number: string
+              p_remote_jid: string
+              p_wa_message_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_business_phone: string
+              p_content: string
+              p_display_name: string
+              p_from_me: boolean
+              p_integration_token: string
+              p_is_history?: boolean
+              p_media_path?: string
+              p_message_at: string
+              p_message_type: string
+              p_phone_number: string
+              p_remote_jid: string
+              p_wa_message_id: string
+            }
+            Returns: string
+          }
+      worker_update_whatsapp_message_delivery: {
+        Args: {
+          p_integration_token: string
+          p_status: string
+          p_wa_message_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
@@ -530,12 +734,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -559,11 +763,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -584,11 +788,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -609,11 +813,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -626,11 +830,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
