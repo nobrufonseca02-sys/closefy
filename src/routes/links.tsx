@@ -13,7 +13,14 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/links")({
   component: LinksPage,
-  head: () => ({ meta: [{ title: "Central de Links · Closefy" }] }),
+  head: () => ({ meta: [
+    { title: "Central de Links · Closefy" },
+    { name: "description", content: "Centralize links de clientes, reuniões e pagamentos no Closefy." },
+    { property: "og:title", content: "Central de Links · Closefy" },
+    { property: "og:description", content: "Centralize links de clientes, reuniões e pagamentos no Closefy." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
 });
 
 function LinksPage() {

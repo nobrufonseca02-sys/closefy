@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
@@ -35,7 +36,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -86,8 +87,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Closefy" },
       { name: "twitter:description", content: "Mini-CRM para controle de leads high ticket: Kanban, tags e feedbacks de reunião." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fead0b95-a480-4be4-81b0-2b20b99e80a8/id-preview-3e18581a--7e5c263a-2ffe-4220-81d2-5b4fcafe26fd.lovable.app-1783705935980.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fead0b95-a480-4be4-81b0-2b20b99e80a8/id-preview-3e18581a--7e5c263a-2ffe-4220-81d2-5b4fcafe26fd.lovable.app-1783705935980.png" },
     ],
     links: [
       {

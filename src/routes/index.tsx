@@ -26,6 +26,14 @@ import { ETAPAS, type EtapaFunil, type Lead } from "@/lib/domain";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
+  head: () => ({ meta: [
+    { title: "Kanban comercial | Closefy" },
+    { name: "description", content: "Organize leads e acompanhe o funil comercial no Closefy." },
+    { property: "og:title", content: "Kanban comercial | Closefy" },
+    { property: "og:description", content: "Organize leads e acompanhe o funil comercial no Closefy." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: KanbanPage,
 });
 

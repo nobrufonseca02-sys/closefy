@@ -13,7 +13,14 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/vendas")({
   component: VendasPage,
-  head: () => ({ meta: [{ title: "Vendas e Comissões · Closefy" }] }),
+  head: () => ({ meta: [
+    { title: "Vendas e Comissões · Closefy" },
+    { name: "description", content: "Gerencie vendas, pagamentos e comissões comerciais no Closefy." },
+    { property: "og:title", content: "Vendas e Comissões · Closefy" },
+    { property: "og:description", content: "Gerencie vendas, pagamentos e comissões comerciais no Closefy." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
 });
 
 const PAID_STATUSES: PaymentStatus[] = ["pago"];

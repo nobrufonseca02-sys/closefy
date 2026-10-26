@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.verify_whatsapp_worker_token(TEXT) TO service_role;
