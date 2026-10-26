@@ -16,6 +16,7 @@ import QRCode from "qrcode";
 import { config } from "./config.js";
 import { startHealthServer, type SyncStatus } from "./health.js";
 import { log } from "./logger.js";
+import { toWhatsAppVoice } from "./audioConvert.js";
 import { acquireSingleInstanceLock } from "./singleInstance.js";
 import {
   addContacts,
@@ -402,7 +403,8 @@ async function pollOutboundMessages(): Promise<void> {
         const sent =
           message.message_type === "audio" && message.media_path
             ? await (async () => {
-                const { buffer, mimetype } = await downloadOutboundAudio(message.media_path!);
+                const raw = await downloadOutboundAudio(message.media_path!);
+                const { buffer, mimetype } = await toWhatsAppVoice(raw.buffer, raw.mimetype);
                 return socket.sendMessage(message.remote_jid, {
                   audio: buffer,
                   mimetype,
