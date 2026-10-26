@@ -1,1 +1,7 @@
 project_id = "anqjlcrwjwmwuanewbje"
+
+[functions.whatsapp-audio-upload]
+# Auth here is the shared WHATSAPP_INTEGRATION_TOKEN header the function
+# checks itself (see verify_whatsapp_worker_token), not a Supabase JWT.
+verify_jwt = false
+

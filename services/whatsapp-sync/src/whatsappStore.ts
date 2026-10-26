@@ -5,16 +5,6 @@ const supabase = createClient(config.supabaseUrl, config.supabaseKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-// Storage has no SECURITY DEFINER-style wrapper to lean on like the RPC
-// calls do, so bucket writes need an actually privileged client. Falls back
-// to the regular client (which will just hit the bucket's RLS policy and
-// fail, same as before) if no service role key is configured yet.
-const storageClient = config.serviceRoleKey
-  ? createClient(config.supabaseUrl, config.serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-  : supabase;
-
 function workerRpc(name: string): string {
   return config.integrationToken ? `worker_${name}` : name;
 }
@@ -45,30 +35,36 @@ export type MessageSyncInput = ConversationSyncInput & {
   mediaPath?: string | null;
 };
 
-const AUDIO_BUCKET = "whatsapp-audio";
-
-function audioExtension(mimetype: string): string {
-  const subtype = mimetype.split(";")[0]?.split("/")[1]?.trim().toLowerCase();
-  if (subtype === "ogg") return "ogg";
-  if (subtype === "mp4" || subtype === "m4a" || subtype === "aac") return "m4a";
-  if (subtype === "mpeg" || subtype === "mp3") return "mp3";
-  if (subtype === "webm") return "webm";
-  if (subtype === "wav" || subtype === "x-wav") return "wav";
-  return "bin";
-}
-
+// Storage has no SECURITY DEFINER-style wrapper to lean on like the RPC
+// calls do, so bucket writes need an actually privileged caller. Rather than
+// handing this worker a standing service-role key, the privileged part runs
+// inside the whatsapp-audio-upload edge function (which gets service_role
+// access automatically from Supabase); this just calls it with the same
+// shared integration token used for every other worker_* RPC.
 export async function uploadAudioMedia(
   waMessageId: string,
   buffer: Buffer,
   mimetype: string,
 ): Promise<string> {
-  const safeId = waMessageId.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const path = `${safeId}.${audioExtension(mimetype)}`;
-  const { error } = await storageClient.storage
-    .from(AUDIO_BUCKET)
-    .upload(path, buffer, { contentType: mimetype, upsert: true });
-  if (error) throw new Error(`Could not upload WhatsApp audio: ${error.message}`);
-  return path;
+  if (!config.integrationToken) {
+    throw new Error("WHATSAPP_INTEGRATION_TOKEN is required to upload WhatsApp audio");
+  }
+  const response = await fetch(`${config.supabaseUrl}/functions/v1/whatsapp-audio-upload`, {
+    method: "POST",
+    headers: {
+      "content-type": mimetype,
+      "x-integration-token": config.integrationToken,
+      "x-wa-message-id": waMessageId,
+    },
+    body: new Uint8Array(buffer),
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | { path?: string; error?: string }
+    | null;
+  if (!response.ok || !payload?.path) {
+    throw new Error(`Could not upload WhatsApp audio: ${payload?.error || response.statusText}`);
+  }
+  return payload.path;
 }
 
 export type ClaimedOutboundMessage = {

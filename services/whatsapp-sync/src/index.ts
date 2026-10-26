@@ -1,6 +1,7 @@
 import makeWASocket, {
   Browsers,
   DisconnectReason,
+  fetchLatestBaileysVersion,
   jidDecode,
   jidNormalizedUser,
   useMultiFileAuthState as loadMultiFileAuthState,
@@ -215,8 +216,26 @@ async function retryPending(): Promise<void> {
 
 async function start(): Promise<void> {
   const { state, saveCreds } = await loadMultiFileAuthState(config.authStateDir);
+
+  // The library ships with a hardcoded WA Web protocol version that goes stale
+  // between releases; WhatsApp rejects login/registration with an instant 401
+  // once it drifts behind what Meta currently requires. Always ask for the
+  // live version instead of trusting the baked-in default.
+  let version: [number, number, number] | undefined;
+  try {
+    const latest = await fetchLatestBaileysVersion();
+    version = latest.version;
+    log.info({ event: "baileys_version_resolved", version, isLatest: latest.isLatest });
+  } catch (error) {
+    log.warn({
+      event: "baileys_version_fetch_failed",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   const sock = makeWASocket({
     auth: state,
+    version,
     browser: Browsers.ubuntu("Chrome"),
     syncFullHistory: true,
     shouldSyncHistoryMessage: () => true,

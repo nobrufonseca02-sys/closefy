@@ -32,3 +32,5 @@ services/whatsapp-sync/auth_state*/
 *.njsproj
 *.sln
 *.sw?
+
+supabase/.temp/
