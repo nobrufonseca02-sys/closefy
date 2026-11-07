@@ -528,6 +528,7 @@ export type Database = {
           id: string
           last_seen_at: string | null
           lease_until: string | null
+          legacy_auth: boolean
           qr_data_url: string | null
           qr_expires_at: string | null
           status: string
@@ -544,6 +545,7 @@ export type Database = {
           id?: string
           last_seen_at?: string | null
           lease_until?: string | null
+          legacy_auth?: boolean
           qr_data_url?: string | null
           qr_expires_at?: string | null
           status?: string
@@ -560,6 +562,7 @@ export type Database = {
           id?: string
           last_seen_at?: string | null
           lease_until?: string | null
+          legacy_auth?: boolean
           qr_data_url?: string | null
           qr_expires_at?: string | null
           status?: string
@@ -630,6 +633,10 @@ export type Database = {
       mark_whatsapp_conversation_read: {
         Args: { p_conversation_id: string }
         Returns: undefined
+      }
+      request_whatsapp_pairing: {
+        Args: { p_disconnect?: boolean }
+        Returns: string
       }
       retry_whatsapp_message: {
         Args: { p_message_id: string }
@@ -745,6 +752,42 @@ export type Database = {
           p_integration_token: string
         }
         Returns: undefined
+      }
+      worker_lease_whatsapp_sessions: {
+        Args: { p_integration_token: string; p_worker_id: string }
+        Returns: {
+          business_phone: string | null
+          created_at: string
+          desired_state: string
+          error_message: string | null
+          history_complete: boolean
+          id: string
+          last_seen_at: string | null
+          lease_until: string | null
+          legacy_auth: boolean
+          qr_data_url: string | null
+          qr_expires_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "whatsapp_sessions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      worker_session_call: {
+        Args: {
+          p_integration_token: string
+          p_operation: string
+          p_payload?: Json
+          p_session_id: string
+          p_worker_id: string
+        }
+        Returns: Json
       }
       worker_sync_whatsapp_conversation: {
         Args: {
