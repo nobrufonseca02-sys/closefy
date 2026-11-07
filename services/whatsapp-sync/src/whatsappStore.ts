@@ -5,50 +5,19 @@ const supabase = createClient(config.supabaseUrl, config.supabaseKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-function workerRpc(name: string): string {
-  return config.integrationToken ? `worker_${name}` : name;
-}
+// ---------------------------------------------------------------------------
+// Audio upload/download go through dedicated edge functions keyed by
+// wa_message_id / an explicit outbound/<user_id>/... storage path, not by
+// session — they need no per-tenant routing of their own (see
+// supabase/functions/whatsapp-audio-{upload,download}), just the same shared
+// integration token every worker_* RPC uses.
+// ---------------------------------------------------------------------------
 
-function workerParams<T extends Record<string, unknown>>(
-  params: T,
-): T & {
-  p_integration_token?: string;
-} {
-  return config.integrationToken
-    ? { ...params, p_integration_token: config.integrationToken }
-    : params;
-}
-
-export type ConversationSyncInput = {
-  remoteJid: string;
-  phone: string;
-  displayName: string | null;
-  activityAt: Date;
-  fromMe: boolean;
-};
-
-export type MessageSyncInput = ConversationSyncInput & {
-  waMessageId: string;
-  content: string;
-  messageType: string;
-  isHistory: boolean;
-  mediaPath?: string | null;
-};
-
-// Storage has no SECURITY DEFINER-style wrapper to lean on like the RPC
-// calls do, so bucket writes need an actually privileged caller. Rather than
-// handing this worker a standing service-role key, the privileged part runs
-// inside the whatsapp-audio-upload edge function (which gets service_role
-// access automatically from Supabase); this just calls it with the same
-// shared integration token used for every other worker_* RPC.
 export async function uploadAudioMedia(
   waMessageId: string,
   buffer: Buffer,
   mimetype: string,
 ): Promise<string> {
-  if (!config.integrationToken) {
-    throw new Error("WHATSAPP_INTEGRATION_TOKEN is required to upload WhatsApp audio");
-  }
   const response = await fetch(`${config.supabaseUrl}/functions/v1/whatsapp-audio-upload`, {
     method: "POST",
     headers: {
@@ -67,23 +36,9 @@ export async function uploadAudioMedia(
   return payload.path;
 }
 
-export type ClaimedOutboundMessage = {
-  outbound_id: string;
-  conversation_id: string;
-  remote_jid: string;
-  phone_number: string;
-  content: string;
-  message_type: string;
-  media_path: string | null;
-  attempts: number;
-};
-
 export async function downloadOutboundAudio(
   mediaPath: string,
 ): Promise<{ buffer: Buffer; mimetype: string }> {
-  if (!config.integrationToken) {
-    throw new Error("WHATSAPP_INTEGRATION_TOKEN is required to send WhatsApp audio");
-  }
   const url = new URL(`${config.supabaseUrl}/functions/v1/whatsapp-audio-download`);
   url.searchParams.set("path", mediaPath);
   const response = await fetch(url, {
@@ -98,128 +53,142 @@ export async function downloadOutboundAudio(
   return { buffer, mimetype };
 }
 
-export async function syncConversation(input: ConversationSyncInput): Promise<string> {
-  const { data, error } = await supabase.rpc(
-    workerRpc("sync_whatsapp_conversation"),
-    workerParams({
-      p_business_phone: config.businessPhoneDigits,
-      p_remote_jid: input.remoteJid,
-      p_phone_number: input.phone,
-      p_display_name: input.displayName,
-      p_activity_at: input.activityAt.toISOString(),
-      p_from_me: input.fromMe,
-    }),
-  );
-  if (error) throw new Error(`Closefy conversation sync failed: ${error.message}`);
-  return data as string;
-}
+// ---------------------------------------------------------------------------
+// Everything else is per-session and goes through the single worker_session_call
+// gateway (drizzle/migrations/0003_private_whatsapp_pairing.sql): it checks this
+// worker actually holds the lease for p_session_id, then scopes every nested
+// call to that session's own user_id before touching any tenant data. Direct
+// calls to the old worker_sync_whatsapp_* RPCs are still possible but fall back
+// to a hardcoded legacy account (see 0002) — never call those from here.
+// ---------------------------------------------------------------------------
 
-function isMissingMediaPathOverload(error: { code?: string; message?: string }): boolean {
-  return (
-    error.code === "PGRST202" &&
-    typeof error.message === "string" &&
-    error.message.includes("p_media_path")
-  );
-}
+export type ConversationSyncInput = {
+  remoteJid: string;
+  phone: string;
+  displayName: string | null;
+  activityAt: Date;
+  fromMe: boolean;
+};
 
-export async function syncMessage(input: MessageSyncInput): Promise<string> {
-  const baseParams = {
-    p_business_phone: config.businessPhoneDigits,
-    p_remote_jid: input.remoteJid,
-    p_phone_number: input.phone,
-    p_display_name: input.displayName,
-    p_wa_message_id: input.waMessageId,
-    p_content: input.content,
-    p_message_type: input.messageType,
-    p_message_at: input.activityAt.toISOString(),
-    p_from_me: input.fromMe,
-    p_is_history: input.isHistory,
+export type MessageSyncInput = ConversationSyncInput & {
+  waMessageId: string;
+  content: string;
+  messageType: string;
+  isHistory: boolean;
+  mediaPath?: string | null;
+};
+
+export type ClaimedOutboundMessage = {
+  outbound_id: string;
+  conversation_id: string;
+  remote_jid: string;
+  phone_number: string;
+  content: string;
+  message_type: string;
+  media_path: string | null;
+  attempts: number;
+};
+
+export type SessionStatusReport =
+  | { status: "pairing"; qrDataUrl: string }
+  | { status: "connected"; businessPhone: string; historyComplete?: boolean }
+  | { status: "disconnected" }
+  | { status: "error"; errorMessage: string };
+
+export type SessionStore = ReturnType<typeof createSessionStore>;
+
+export function createSessionStore(sessionId: string) {
+  async function call(operation: string, payload: Record<string, unknown> = {}): Promise<unknown> {
+    const { data, error } = await supabase.rpc("worker_session_call", {
+      p_integration_token: config.integrationToken,
+      p_session_id: sessionId,
+      p_worker_id: config.workerId,
+      p_operation: operation,
+      p_payload: payload,
+    });
+    if (error) throw new Error(`Closefy session [${operation}] failed: ${error.message}`);
+    return data;
+  }
+
+  return {
+    sessionId,
+
+    async reportStatus(report: SessionStatusReport): Promise<void> {
+      await call("status", {
+        status: report.status,
+        ...(report.status === "pairing" ? { qr_data_url: report.qrDataUrl } : {}),
+        ...(report.status === "connected"
+          ? { business_phone: report.businessPhone, history_complete: report.historyComplete }
+          : {}),
+        ...(report.status === "error" ? { error_message: report.errorMessage } : {}),
+      });
+    },
+
+    async syncConversation(input: ConversationSyncInput): Promise<string> {
+      return (await call("sync_conversation", {
+        p_remote_jid: input.remoteJid,
+        p_phone_number: input.phone,
+        p_display_name: input.displayName,
+        p_activity_at: input.activityAt.toISOString(),
+        p_from_me: input.fromMe,
+      })) as string;
+    },
+
+    async syncMessage(input: MessageSyncInput): Promise<string> {
+      return (await call("sync_message", {
+        p_remote_jid: input.remoteJid,
+        p_phone_number: input.phone,
+        p_display_name: input.displayName,
+        p_wa_message_id: input.waMessageId,
+        p_content: input.content,
+        p_message_type: input.messageType,
+        p_message_at: input.activityAt.toISOString(),
+        p_from_me: input.fromMe,
+        p_is_history: input.isHistory,
+        p_media_path: input.mediaPath ?? null,
+      })) as string;
+    },
+
+    async claimOutboundMessages(limit = 10): Promise<ClaimedOutboundMessage[]> {
+      return ((await call("claim", { p_limit: limit })) || []) as ClaimedOutboundMessage[];
+    },
+
+    async completeOutboundMessage(messageId: string, waMessageId: string, sentAt: Date): Promise<void> {
+      await call("complete", {
+        p_message_id: messageId,
+        p_wa_message_id: waMessageId,
+        p_sent_at: sentAt.toISOString(),
+      });
+    },
+
+    async failOutboundMessage(messageId: string, reason: string): Promise<void> {
+      await call("fail", { p_message_id: messageId, p_error_message: reason });
+    },
+
+    async updateMessageDelivery(waMessageId: string, status: "delivered" | "read"): Promise<void> {
+      await call("delivery", { p_wa_message_id: waMessageId, p_status: status });
+    },
   };
-
-  const { data, error } = await supabase.rpc(
-    workerRpc("sync_whatsapp_message"),
-    workerParams({ ...baseParams, p_media_path: input.mediaPath ?? null }),
-  );
-  if (!error) return data as string;
-
-  // The media_path migration may not be applied yet on this project. Fall
-  // back to the pre-migration call shape so plain message sync never breaks
-  // because of an audio-only feature lagging behind in the database.
-  if (!isMissingMediaPathOverload(error)) {
-    throw new Error(`Closefy message sync failed: ${error.message}`);
-  }
-  const fallback = await supabase.rpc(workerRpc("sync_whatsapp_message"), workerParams(baseParams));
-  if (fallback.error) {
-    throw new Error(`Closefy message sync failed: ${fallback.error.message}`);
-  }
-  return fallback.data as string;
 }
 
-export async function claimOutboundMessages(limit = 10): Promise<ClaimedOutboundMessage[]> {
-  const { data, error } = await supabase.rpc(
-    workerRpc("claim_whatsapp_outbound_messages"),
-    workerParams({
-      p_limit: limit,
-    }),
-  );
-  if (error) throw new Error(`Could not claim outbound messages: ${error.message}`);
-  return (data || []) as ClaimedOutboundMessage[];
-}
+// ---------------------------------------------------------------------------
+// Fleet-level: which sessions should this worker be running right now.
+// ---------------------------------------------------------------------------
 
-export async function completeOutboundMessage(
-  messageId: string,
-  waMessageId: string,
-  sentAt: Date,
-): Promise<void> {
-  const { error } = await supabase.rpc(
-    workerRpc("complete_whatsapp_outbound_message"),
-    workerParams({
-      p_message_id: messageId,
-      p_wa_message_id: waMessageId,
-      p_sent_at: sentAt.toISOString(),
-    }),
-  );
-  if (error) throw new Error(`Could not complete outbound message: ${error.message}`);
-}
+export type LeasedSession = {
+  id: string;
+  user_id: string;
+  business_phone: string | null;
+  desired_state: "connected" | "disconnected";
+  status: string;
+  legacy_auth: boolean;
+};
 
-export async function failOutboundMessage(messageId: string, reason: string): Promise<void> {
-  const { error } = await supabase.rpc(
-    workerRpc("fail_whatsapp_outbound_message"),
-    workerParams({
-      p_message_id: messageId,
-      p_error_message: reason,
-    }),
-  );
-  if (error) throw new Error(`Could not fail outbound message: ${error.message}`);
-}
-
-export async function updateMessageDelivery(
-  waMessageId: string,
-  status: "delivered" | "read",
-): Promise<void> {
-  const { error } = await supabase.rpc(
-    workerRpc("update_whatsapp_message_delivery"),
-    workerParams({
-      p_wa_message_id: waMessageId,
-      p_status: status,
-    }),
-  );
-  if (error) throw new Error(`Could not update message delivery: ${error.message}`);
-}
-
-export async function heartbeat(
-  connected: boolean,
-  historyComplete: boolean,
-  errorMessage: string | null = null,
-): Promise<void> {
-  const { error } = await supabase.rpc(
-    workerRpc("heartbeat_whatsapp_connection"),
-    workerParams({
-      p_business_phone: config.businessPhoneDigits,
-      p_connected: connected,
-      p_history_complete: historyComplete,
-      p_error_message: errorMessage,
-    }),
-  );
-  if (error) throw new Error(`Could not update WhatsApp heartbeat: ${error.message}`);
+export async function leaseSessions(): Promise<LeasedSession[]> {
+  const { data, error } = await supabase.rpc("worker_lease_whatsapp_sessions", {
+    p_integration_token: config.integrationToken,
+    p_worker_id: config.workerId,
+  });
+  if (error) throw new Error(`Could not lease WhatsApp sessions: ${error.message}`);
+  return (data || []) as LeasedSession[];
 }

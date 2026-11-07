@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
@@ -32,12 +33,18 @@ interface Props {
  */
 function useRequireAuth() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [ready, setReady] = useState(false);
+  // "undefined" = not observed yet (skip the clear on first paint); after
+  // that, any change in who's logged in (including to/from signed-out)
+  // means every cached query might belong to the wrong account.
+  const lastUserIdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
+      lastUserIdRef.current = data.session?.user.id ?? null;
       if (!data.session) {
         navigate({ to: "/login" });
       } else {
@@ -45,13 +52,22 @@ function useRequireAuth() {
       }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const userId = session?.user.id ?? null;
+      if (lastUserIdRef.current !== undefined && lastUserIdRef.current !== userId) {
+        // Identity changed (sign-out, or a different account signed in on
+        // the same tab without a full reload): drop every cached query so
+        // the next account never sees a stale flash of someone else's
+        // leads, Kanban cards or WhatsApp conversations.
+        queryClient.clear();
+      }
+      lastUserIdRef.current = userId;
       if (!session) navigate({ to: "/login" });
     });
     return () => {
       active = false;
       sub.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   return ready;
 }

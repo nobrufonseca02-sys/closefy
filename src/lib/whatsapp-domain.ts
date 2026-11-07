@@ -40,19 +40,33 @@ export type WhatsAppMessage = {
   updated_at: string;
 };
 
-export type WhatsAppConnectionStatus = {
-  business_phone: string;
-  status: "connected" | "disconnected" | "error";
+export type WhatsAppSessionStatus =
+  "requested" | "pairing" | "connected" | "disconnecting" | "disconnected" | "error";
+
+export type WhatsAppSession = {
+  id: string;
+  user_id: string;
+  business_phone: string | null;
+  desired_state: "connected" | "disconnected";
+  status: WhatsAppSessionStatus;
+  qr_data_url: string | null;
+  qr_expires_at: string | null;
+  last_seen_at: string | null;
   history_complete: boolean;
-  last_seen_at: string;
-  history_synced_at: string | null;
   error_message: string | null;
+  legacy_auth: boolean;
+  created_at: string;
   updated_at: string;
 };
 
-export function isConnectionLive(connection: WhatsAppConnectionStatus | null | undefined): boolean {
-  if (!connection || connection.status !== "connected") return false;
-  return Date.now() - new Date(connection.last_seen_at).getTime() < 90_000;
+export function isConnectionLive(session: WhatsAppSession | null | undefined): boolean {
+  if (!session || session.status !== "connected" || !session.last_seen_at) return false;
+  return Date.now() - new Date(session.last_seen_at).getTime() < 90_000;
+}
+
+export function isQrExpired(session: WhatsAppSession | null | undefined): boolean {
+  if (!session?.qr_expires_at) return true;
+  return Date.now() >= new Date(session.qr_expires_at).getTime();
 }
 
 export function conversationName(conversation: WhatsAppConversation): string {

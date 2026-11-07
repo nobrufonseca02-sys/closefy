@@ -10,12 +10,15 @@ import {
   Loader2,
   Mic,
   MessageCircle,
+  QrCode,
   RefreshCw,
   Search,
   Send,
   Square,
   Trash2,
   UserRoundPlus,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useMarkWhatsAppConversationRead,
+  useRequestWhatsAppPairing,
   useRetryWhatsAppMessage,
   useSendWhatsAppAudioMessage,
   useSendWhatsAppMessage,
@@ -49,21 +53,31 @@ import {
   conversationName,
   formatWhatsAppPhone,
   isConnectionLive,
+  isQrExpired,
   type WhatsAppConversation,
   type WhatsAppMessage,
+  type WhatsAppSession,
 } from "@/lib/whatsapp-domain";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/conversas")({
-  head: () => ({ meta: [
-    { title: "Conversas | Closefy" },
-    { name: "description", content: "Acompanhe conversas e mensagens de WhatsApp dos seus contatos no Closefy." },
-    { property: "og:title", content: "Conversas | Closefy" },
-    { property: "og:description", content: "Acompanhe conversas e mensagens de WhatsApp dos seus contatos no Closefy." },
-    { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary_large_image" },
-  ] }),
+  head: () => ({
+    meta: [
+      { title: "Conversas | Closefy" },
+      {
+        name: "description",
+        content: "Acompanhe conversas e mensagens de WhatsApp dos seus contatos no Closefy.",
+      },
+      { property: "og:title", content: "Conversas | Closefy" },
+      {
+        property: "og:description",
+        content: "Acompanhe conversas e mensagens de WhatsApp dos seus contatos no Closefy.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: ConversationsPage,
 });
 
@@ -74,6 +88,7 @@ function ConversationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const [pairingOpen, setPairingOpen] = useState(false);
 
   const selected = conversations.find((item) => item.id === selectedId) || null;
   const filtered = useMemo(() => {
@@ -120,7 +135,7 @@ function ConversationsPage() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "whatsapp_connection_status" },
+        { event: "*", schema: "public", table: "whatsapp_sessions" },
         () => void queryClient.invalidateQueries({ queryKey: whatsappConnectionKey }),
       )
       .subscribe();
@@ -147,9 +162,13 @@ function ConversationsPage() {
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h1 className="font-semibold tracking-tight">Conversas</h1>
-                <p className="text-xs text-muted-foreground">+55 21 99417-7491</p>
+                <p className="text-xs text-muted-foreground">
+                  {connection?.business_phone
+                    ? formatWhatsAppPhone(connection.business_phone)
+                    : "WhatsApp não conectado"}
+                </p>
               </div>
-              <ConnectionBadge live={isConnectionLive(connection)} />
+              <ConnectionBadge session={connection} onClick={() => setPairingOpen(true)} />
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -216,19 +235,149 @@ function ConversationsPage() {
         connected={isConnectionLive(connection)}
         onCreated={setSelectedId}
       />
+
+      <WhatsAppPairingDialog
+        open={pairingOpen}
+        onOpenChange={setPairingOpen}
+        session={connection}
+      />
     </AppShell>
   );
 }
 
-function ConnectionBadge({ live }: { live: boolean }) {
+function ConnectionBadge({
+  session,
+  onClick,
+}: {
+  session: WhatsAppSession | null | undefined;
+  onClick: () => void;
+}) {
+  const live = isConnectionLive(session);
   return (
-    <Badge
-      variant="outline"
-      className={cn("gap-1.5", live ? "text-success" : "text-muted-foreground")}
-    >
-      <span className={cn("size-1.5 rounded-full", live ? "bg-success" : "bg-muted-foreground")} />
-      {live ? "Conectado" : "Desconectado"}
-    </Badge>
+    <button type="button" onClick={onClick}>
+      <Badge
+        variant="outline"
+        className={cn(
+          "gap-1.5 transition-colors hover:bg-muted",
+          live ? "text-success" : "text-muted-foreground",
+        )}
+      >
+        <span
+          className={cn("size-1.5 rounded-full", live ? "bg-success" : "bg-muted-foreground")}
+        />
+        {live ? "Conectado" : "Desconectado"}
+      </Badge>
+    </button>
+  );
+}
+
+function WhatsAppPairingDialog({
+  open,
+  onOpenChange,
+  session,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  session: WhatsAppSession | null | undefined;
+}) {
+  const requestPairing = useRequestWhatsAppPairing();
+  const live = isConnectionLive(session);
+
+  // Fire the pairing request the moment the dialog opens if there's no
+  // active/requested session yet, so the user doesn't have to click twice.
+  useEffect(() => {
+    if (!open) return;
+    const needsRequest =
+      !session || session.desired_state === "disconnected" || session.status === "error";
+    if (needsRequest && !requestPairing.isPending) {
+      requestPairing.mutate(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const disconnect = () => {
+    requestPairing.mutate(true, {
+      onSuccess: () => toast.success("WhatsApp desconectado"),
+    });
+  };
+
+  const retry = () => requestPairing.mutate(false);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[calc(100%-1.5rem)] max-w-sm rounded-xl p-6 text-center">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-center gap-2">
+            {live ? (
+              <Wifi className="size-5 text-success" />
+            ) : (
+              <QrCode className="size-5 text-muted-foreground" />
+            )}
+            Conectar WhatsApp
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="mt-2 flex flex-col items-center gap-4">
+          {live ? (
+            <>
+              <div className="grid size-16 place-items-center rounded-full bg-success/10 text-success">
+                <Wifi className="size-8" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Conectado</p>
+                <p className="text-xs text-muted-foreground">
+                  {session?.business_phone ? formatWhatsAppPhone(session.business_phone) : ""}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={disconnect}
+                disabled={requestPairing.isPending}
+              >
+                <WifiOff className="size-4" />
+                Desconectar
+              </Button>
+            </>
+          ) : session?.status === "error" ? (
+            <>
+              <div className="grid size-16 place-items-center rounded-full bg-destructive/10 text-destructive">
+                <AlertCircle className="size-8" />
+              </div>
+              <p className="text-sm text-destructive">
+                {session.error_message || "Não foi possível conectar."}
+              </p>
+              <Button onClick={retry} disabled={requestPairing.isPending} className="gap-2">
+                <RefreshCw className="size-4" />
+                Tentar novamente
+              </Button>
+            </>
+          ) : session?.status === "pairing" && session.qr_data_url && !isQrExpired(session) ? (
+            <>
+              <img
+                src={session.qr_data_url}
+                alt="QR Code do WhatsApp"
+                className="size-56 rounded-lg border bg-white p-2"
+              />
+              <p className="text-xs text-muted-foreground">
+                No celular: WhatsApp &gt; Aparelhos conectados &gt; Conectar um aparelho
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="grid size-16 place-items-center rounded-full bg-primary/10 text-primary">
+                <Loader2 className="size-8 animate-spin" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {session?.status === "pairing"
+                  ? "Gerando um novo código..."
+                  : "Preparando a conexão, isso pode levar até um minuto..."}
+              </p>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -306,7 +455,12 @@ function useVoiceRecorder() {
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
       stopStream();
-      setState({ phase: "recorded", blob, url: URL.createObjectURL(blob), durationMs: Date.now() - startedAt });
+      setState({
+        phase: "recorded",
+        blob,
+        url: URL.createObjectURL(blob),
+        durationMs: Date.now() - startedAt,
+      });
     };
     recorder.start();
     recorderRef.current = recorder;

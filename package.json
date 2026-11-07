@@ -11,7 +11,6 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "whatsapp:dev": "npm --prefix services/whatsapp-sync run dev",
-    "whatsapp:pair": "npm --prefix services/whatsapp-sync run pair",
     "whatsapp:test": "npm --prefix services/whatsapp-sync test",
     "whatsapp:typecheck": "npm --prefix services/whatsapp-sync run typecheck"
   },

@@ -1,10 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type {
-  WhatsAppConnectionStatus,
-  WhatsAppConversation,
-  WhatsAppMessage,
-} from "./whatsapp-domain";
+import type { WhatsAppConversation, WhatsAppMessage, WhatsAppSession } from "./whatsapp-domain";
 
 export const whatsappConversationsKey = ["whatsapp-conversations"] as const;
 export const whatsappConnectionKey = ["whatsapp-connection"] as const;
@@ -64,16 +60,34 @@ export function useWhatsAppAudioUrl(path: string | null) {
 export function useWhatsAppConnection() {
   return useQuery({
     queryKey: whatsappConnectionKey,
-    queryFn: async (): Promise<WhatsAppConnectionStatus | null> => {
-      const { data, error } = await supabase
-        .from("whatsapp_connection_status")
-        .select("*")
-        .eq("business_phone", "+5521994177491")
-        .maybeSingle();
+    queryFn: async (): Promise<WhatsAppSession | null> => {
+      // RLS scopes this to at most one row: the authenticated user's own
+      // session (UNIQUE user_id on whatsapp_sessions).
+      const { data, error } = await supabase.from("whatsapp_sessions").select("*").maybeSingle();
       if (error) throw error;
-      return data as WhatsAppConnectionStatus | null;
+      return data as WhatsAppSession | null;
     },
-    refetchInterval: 15_000,
+    // Pairing (QR) is a short-lived flow the user is actively watching;
+    // once connected, the realtime subscription in conversas.tsx keeps this
+    // fresh and this interval is just a safety net.
+    refetchInterval: (query) =>
+      query.state.data?.status === "pairing" || query.state.data?.status === "requested"
+        ? 3_000
+        : 20_000,
+  });
+}
+
+export function useRequestWhatsAppPairing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (disconnect: boolean) => {
+      const { data, error } = await supabase.rpc("request_whatsapp_pairing", {
+        p_disconnect: disconnect,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: whatsappConnectionKey }),
   });
 }
 
@@ -121,13 +135,7 @@ function audioExtension(mimetype: string): string {
 export function useSendWhatsAppAudioMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      conversationId,
-      blob,
-    }: {
-      conversationId: string;
-      blob: Blob;
-    }) => {
+    mutationFn: async ({ conversationId, blob }: { conversationId: string; blob: Blob }) => {
       const path = `outbound/${conversationId}/${crypto.randomUUID()}.${audioExtension(blob.type)}`;
       const { error: uploadError } = await supabase.storage
         .from("whatsapp-audio")

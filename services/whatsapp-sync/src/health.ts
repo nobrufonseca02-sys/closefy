@@ -2,7 +2,10 @@ import http from "node:http";
 import { config } from "./config.js";
 import { log } from "./logger.js";
 
-export type SyncStatus = {
+export type SessionHealth = {
+  sessionId: string;
+  userId: string;
+  businessPhone: string | null;
   connected: boolean;
   historyComplete: boolean;
   synced: number;
@@ -11,16 +14,25 @@ export type SyncStatus = {
   failed: number;
 };
 
-export function startHealthServer(status: SyncStatus): void {
+/** `sessions` is a live Map the caller keeps mutating; each response reads
+ * its current contents, no snapshot needed. */
+export function startHealthServer(sessions: Map<string, SessionHealth>): void {
   http
     .createServer((req, res) => {
       if (req.url !== "/health") {
         res.writeHead(404).end();
         return;
       }
-      res.writeHead(status.connected ? 200 : 503, { "content-type": "application/json" });
+      const list = [...sessions.values()];
+      const anyConnected = list.some((session) => session.connected);
+      res.writeHead(anyConnected ? 200 : 503, { "content-type": "application/json" });
       res.end(
-        JSON.stringify({ ok: status.connected, service: "closefy-whatsapp-sync", ...status }),
+        JSON.stringify({
+          ok: anyConnected,
+          service: "closefy-whatsapp-sync",
+          sessionCount: list.length,
+          sessions: list,
+        }),
       );
     })
     .listen(config.port, "0.0.0.0", () => {
