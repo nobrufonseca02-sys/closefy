@@ -15,6 +15,20 @@
       "when": 1793030317693,
       "tag": "0001_grant_whatsapp_worker_token_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794015692711,
+      "tag": "0002_isolate_accounts_and_whatsapp_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794015748340,
+      "tag": "0003_private_whatsapp_pairing",
+      "breakpoints": true
     }
   ]
 }

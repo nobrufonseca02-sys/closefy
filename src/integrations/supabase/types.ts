@@ -27,6 +27,7 @@ export type Database = {
           title: string
           updated_at: string
           url: string
+          user_id: string | null
         }
         Insert: {
           category?: string
@@ -40,6 +41,7 @@ export type Database = {
           title: string
           updated_at?: string
           url: string
+          user_id?: string | null
         }
         Update: {
           category?: string
@@ -53,6 +55,7 @@ export type Database = {
           title?: string
           updated_at?: string
           url?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -79,6 +82,7 @@ export type Database = {
           resultado_reuniao: string | null
           resumo: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -94,6 +98,7 @@ export type Database = {
           resultado_reuniao?: string | null
           resumo?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -109,6 +114,7 @@ export type Database = {
           resultado_reuniao?: string | null
           resumo?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -128,6 +134,7 @@ export type Database = {
           lead_id: string
           note: string | null
           to_stage: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -136,6 +143,7 @@ export type Database = {
           lead_id: string
           note?: string | null
           to_stage: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -144,6 +152,7 @@ export type Database = {
           lead_id?: string
           note?: string | null
           to_stage?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -178,6 +187,7 @@ export type Database = {
           ticket_estimado: number | null
           ultima_atividade_em: string
           updated_at: string
+          user_id: string | null
           whatsapp: string
           whatsapp_business_phone: string | null
           whatsapp_jid: string | null
@@ -208,6 +218,7 @@ export type Database = {
           ticket_estimado?: number | null
           ultima_atividade_em?: string
           updated_at?: string
+          user_id?: string | null
           whatsapp: string
           whatsapp_business_phone?: string | null
           whatsapp_jid?: string | null
@@ -238,6 +249,7 @@ export type Database = {
           ticket_estimado?: number | null
           ultima_atividade_em?: string
           updated_at?: string
+          user_id?: string | null
           whatsapp?: string
           whatsapp_business_phone?: string | null
           whatsapp_jid?: string | null
@@ -269,6 +281,7 @@ export type Database = {
           sale_date: string
           sale_value: number
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           amount_paid?: number
@@ -290,6 +303,7 @@ export type Database = {
           sale_date?: string
           sale_value?: number
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           amount_paid?: number
@@ -311,6 +325,7 @@ export type Database = {
           sale_date?: string
           sale_value?: number
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -330,6 +345,7 @@ export type Database = {
           name: string
           text_color: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           bg_color?: string
@@ -338,6 +354,7 @@ export type Database = {
           name: string
           text_color?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           bg_color?: string
@@ -346,6 +363,7 @@ export type Database = {
           name?: string
           text_color?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -358,6 +376,7 @@ export type Database = {
           last_seen_at: string
           status: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           business_phone: string
@@ -367,6 +386,7 @@ export type Database = {
           last_seen_at?: string
           status?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           business_phone?: string
@@ -376,6 +396,7 @@ export type Database = {
           last_seen_at?: string
           status?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -393,6 +414,7 @@ export type Database = {
           remote_jid: string
           unread_count: number
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           business_phone: string
@@ -407,6 +429,7 @@ export type Database = {
           remote_jid: string
           unread_count?: number
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           business_phone?: string
@@ -421,6 +444,7 @@ export type Database = {
           remote_jid?: string
           unread_count?: number
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -447,6 +471,7 @@ export type Database = {
           sent_at: string
           status: string
           updated_at: string
+          user_id: string | null
           wa_message_id: string | null
         }
         Insert: {
@@ -463,6 +488,7 @@ export type Database = {
           sent_at?: string
           status?: string
           updated_at?: string
+          user_id?: string | null
           wa_message_id?: string | null
         }
         Update: {
@@ -479,6 +505,7 @@ export type Database = {
           sent_at?: string
           status?: string
           updated_at?: string
+          user_id?: string | null
           wa_message_id?: string | null
         }
         Relationships: [
@@ -490,6 +517,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_sessions: {
+        Row: {
+          business_phone: string | null
+          created_at: string
+          desired_state: string
+          error_message: string | null
+          history_complete: boolean
+          id: string
+          last_seen_at: string | null
+          lease_until: string | null
+          legacy_auth: boolean
+          qr_data_url: string | null
+          qr_expires_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          worker_id: string | null
+        }
+        Insert: {
+          business_phone?: string | null
+          created_at?: string
+          desired_state?: string
+          error_message?: string | null
+          history_complete?: boolean
+          id?: string
+          last_seen_at?: string | null
+          lease_until?: string | null
+          legacy_auth?: boolean
+          qr_data_url?: string | null
+          qr_expires_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          worker_id?: string | null
+        }
+        Update: {
+          business_phone?: string | null
+          created_at?: string
+          desired_state?: string
+          error_message?: string | null
+          history_complete?: boolean
+          id?: string
+          last_seen_at?: string | null
+          lease_until?: string | null
+          legacy_auth?: boolean
+          qr_data_url?: string | null
+          qr_expires_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          worker_id?: string | null
+        }
+        Relationships: []
       }
       whatsapp_worker_credentials: {
         Row: {
@@ -514,6 +595,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assert_whatsapp_number: { Args: { p_phone: string }; Returns: undefined }
       claim_whatsapp_outbound_messages: {
         Args: { p_limit?: number }
         Returns: {
@@ -551,6 +633,10 @@ export type Database = {
       mark_whatsapp_conversation_read: {
         Args: { p_conversation_id: string }
         Returns: undefined
+      }
+      request_whatsapp_pairing: {
+        Args: { p_disconnect?: boolean }
+        Returns: string
       }
       retry_whatsapp_message: {
         Args: { p_message_id: string }
@@ -626,6 +712,7 @@ export type Database = {
         Args: { p_integration_token: string }
         Returns: undefined
       }
+      whatsapp_worker_owner: { Args: never; Returns: string }
       worker_claim_whatsapp_outbound_messages: {
         Args: { p_integration_token: string; p_limit?: number }
         Returns: {
@@ -665,6 +752,42 @@ export type Database = {
           p_integration_token: string
         }
         Returns: undefined
+      }
+      worker_lease_whatsapp_sessions: {
+        Args: { p_integration_token: string; p_worker_id: string }
+        Returns: {
+          business_phone: string | null
+          created_at: string
+          desired_state: string
+          error_message: string | null
+          history_complete: boolean
+          id: string
+          last_seen_at: string | null
+          lease_until: string | null
+          legacy_auth: boolean
+          qr_data_url: string | null
+          qr_expires_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "whatsapp_sessions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      worker_session_call: {
+        Args: {
+          p_integration_token: string
+          p_operation: string
+          p_payload?: Json
+          p_session_id: string
+          p_worker_id: string
+        }
+        Returns: Json
       }
       worker_sync_whatsapp_conversation: {
         Args: {
